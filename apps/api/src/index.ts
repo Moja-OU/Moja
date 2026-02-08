@@ -12,18 +12,23 @@ import { BudgetService } from './services/budget.service';
 import { CalendarService } from './services/calendar.service';
 import { NotificationService } from './services/notification.service';
 import { VoiceService } from './services/voice.service';
-import bodyParser from 'body-parser';
 
 dotenv.config();
 
+// Crash handlers — surface silent exits
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught exception:', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('❌ Unhandled rejection:', err);
+});
+
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = parseInt(process.env.PORT || '4000', 10);
 
 app.use(cors());
 app.use(express.json());
-
-app.use(bodyParser.urlencoded({ extended: false }));
-//app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false }));
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -654,11 +659,32 @@ app.post('/voice/process', async (req, res) => {
   }
 });
 
+// Handle Twilio call status updates (hangup, etc.)
+app.post('/voice/status', async (req, res) => {
+  try {
+    const { CallSid, CallStatus } = req.body;
+    console.log(`📞 Call ${CallSid} status: ${CallStatus}`);
+
+    if (CallStatus === 'completed' || CallStatus === 'failed' || CallStatus === 'canceled') {
+      await VoiceService.handleCallEnd(CallSid);
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Voice status error:', error);
+    res.sendStatus(500);
+  }
+});
+
 // ============================================================================
 // START SERVER
 // ============================================================================
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Moja API running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+});
+
+server.on('error', (err) => {
+  console.error('❌ Server error:', err);
 });

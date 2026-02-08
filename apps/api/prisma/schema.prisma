@@ -30,15 +30,16 @@ model User {
 }
 
 model Session {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel     String    // VOICE | CHAT
-  startedAt   DateTime  @default(now())
-  endedAt     DateTime?
-  summary     String?
-  transcript  String?
-  intentTags  String?   // JSON string
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel        String    // VOICE | CHAT
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  summary        String?
+  transcript     String?   // JSON array: [{role, content, timestamp}]
+  intentTags     String?   // JSON string
+  twilioCallSid  String?   // Twilio Call SID for voice sessions
 
   bookings   Booking[]
   activities Activity[]

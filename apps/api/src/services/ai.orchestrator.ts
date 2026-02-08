@@ -1,17 +1,26 @@
 import { AzureOpenAI } from 'openai';
 import { tavily } from "@tavily/core";
 
-// --- Configuration ---
-const openai = new AzureOpenAI({
-  apiKey: "EQlDE5YNVhc7oXxPNXBlrH6lTCu2iiEmoQCaqXGz61Gwk0vPa8mfJQQJ99BLACHYHv6XJ3w3AAAAACOGmu8H", 
+// --- Lazy-initialized SDK clients (created after dotenv.config() runs) ---
+let _openai: AzureOpenAI | null = null;
+function getOpenAI(): AzureOpenAI {
+  if (!_openai) {
+    _openai = new AzureOpenAI({
+      apiKey: process.env.AZURE_OPENAI_KEY,
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+      apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2025-01-01-preview',
+    });
+  }
+  return _openai;
+}
 
-  endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://masik-miq8i01i-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview", 
-  
-  apiVersion: '2024-02-15-preview', 
-});
-
-// Initialize Tavily
-const tvly = tavily({ apiKey: process.env.TAVILY_API_KEY || "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" });
+let _tvly: ReturnType<typeof tavily> | null = null;
+function getTavily() {
+  if (!_tvly) {
+    _tvly = tavily({ apiKey: process.env.TAVILY_API_KEY });
+  }
+  return _tvly;
+}
 
 
 
@@ -165,7 +174,7 @@ export class AIOrchestrator {
       messages.push({ role: 'user', content: userMessage });
 
       // --- PASS 1: Let AI decide (Search vs Talk vs Act) ---
-      let response = await openai.chat.completions.create({
+      let response = await getOpenAI().chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
         messages,
         tools: this.getTools() as any, // Cast to 'any' to avoid strict union mismatch issues
@@ -188,7 +197,7 @@ export class AIOrchestrator {
           console.log(`🕵️ Searching for: ${searchArgs.query}`);
           
           // 1. Execute Search
-          const searchData = await tvly.search(searchArgs.query, { maxResults: 5 });
+          const searchData = await getTavily().search(searchArgs.query, { maxResults: 5 });
           
           // 2. Feed results back to history
           messages.push(responseMessage);
@@ -199,7 +208,7 @@ export class AIOrchestrator {
           });
 
           // 3. PASS 2: AI processes results -> Decides to Talk or Act
-          response = await openai.chat.completions.create({
+          response = await getOpenAI().chat.completions.create({
             model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
             messages,
             tools: this.getTools() as any,
@@ -253,6 +262,11 @@ PERSONALITY
 - Natural, conversational, and helpful
 - Speak like a human assistant
 - Do NOT sound robotic or scripted
+
+MEMORY
+- You have access to recent conversation history from past sessions.
+- If the user asks "what did we talk about last time?" or references a past conversation, use the message history provided to answer.
+- Summarize past interactions naturally when asked.
 
 CORE BEHAVIOR (VERY IMPORTANT)
 

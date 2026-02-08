@@ -2,22 +2,24 @@ import twilio from 'twilio'; // Use the default import
 import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 import { PrismaClient } from '@prisma/client';
 import { BookingService } from './booking.service';
-import { Budget } from '@prisma/client';
 import { AIOrchestrator } from './ai.orchestrator';
 import { GoalService } from './goal.service';
 import { CalendarService } from './calendar.service';
-import { User } from '@prisma/client';
-import { Reminder } from '@prisma/client';
-import { Expense } from '@prisma/client';
-
+import { SessionService } from './session.service';
 
 const prisma = new PrismaClient();
 
-
-const client = twilio(
-  "AC2de570e2a0d0d4ddabd1b808af366700", 
-  "ce5cfbe2b04c99169168ec8262e87a5b"
-);
+// Lazy-initialized Twilio client (created after dotenv.config() runs)
+let _twilioClient: ReturnType<typeof twilio> | null = null;
+function getTwilioClient() {
+  if (!_twilioClient) {
+    _twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+  }
+  return _twilioClient;
+}
 
 
 // State Machine for the Call
@@ -28,9 +30,10 @@ enum CallState {
   HANDOFF = 'HANDOFF'
 }
 
-// In-memory session store (In production, use Redis)
+// In-memory session store (maps Twilio CallSid -> session state)
 interface VoiceSession {
   userId: string;
+  dbSessionId: string; // ID of the persisted Session row
   state: CallState;
   tempData?: any; // To store things like "party size" before booking
   history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
@@ -56,13 +59,16 @@ static async handleIncomingCall(callSid: string, fromNumber: string): Promise<st
     return twiml.toString();
   }
 
-  // Initialize session
-activeCalls[callSid] = {
-  userId: user.id,
-  state: CallState.AUTHENTICATION,
-  history: []   // REQUIRED
-};
+  // Create a persisted VOICE session in the database
+  const dbSession = await SessionService.startSession(user.id, 'VOICE', callSid);
 
+  // Initialize in-memory state
+  activeCalls[callSid] = {
+    userId: user.id,
+    dbSessionId: dbSession.id,
+    state: CallState.AUTHENTICATION,
+    history: []
+  };
 
   const gather = twiml.gather({
     input: ['dtmf', 'speech'],
@@ -104,7 +110,14 @@ static async processInput(callSid: string, speechResult: string, digits: string)
       // ✅ Use DB passwordHash (temporary PIN) for validation
       if (user.passwordHash === input) {
         session.state = CallState.DISCOVERY;
-        twiml.say("Identity verified. Would you like to make a booking, check your budget, or speak to an agent?");
+        const greeting = 'Identity verified. How can I help you today?';
+        twiml.say(greeting);
+
+        // Persist the greeting to DB
+        await SessionService.appendToSession(session.dbSessionId, session.userId, {
+          userMessage: '[PIN entered]',
+          assistantMessage: greeting,
+        });
       } else {
         twiml.say("Incorrect PIN. Please try again.");
         twiml.gather({ input: ['dtmf', 'speech'], action: '/voice/process' });
@@ -114,35 +127,58 @@ static async processInput(callSid: string, speechResult: string, digits: string)
 
 case CallState.DISCOVERY:
             try {
-                // 1. Send speech to AI (AI Orchestrator decides if it's talk, search, or action)
+                // Track user message in history
+                session.history.push({ role: 'user', content: input });
+
+                // Get past session context so AI can reference previous conversations
+                const pastTranscripts = await SessionService.getRecentTranscripts(session.userId, 3);
+
+                // Merge past context with current conversation
+                const contextMessages = [
+                    ...pastTranscripts.map((t) => ({ role: t.role, content: t.content })),
+                    ...session.history,
+                ];
+
+                // Send to AI Orchestrator
                 const aiResponse = await AIOrchestrator.interpretMessage(input, {
                     userProfile: {
                         userId: session.userId,
                         timezone: user.timezone || 'America/Chicago'
                     },
-                    recentMessages: session.history // Pass conversation history if available
+                    recentMessages: contextMessages
                 });
 
-                // 2. Speak AI response (This handles standard conversation AND search results)
-                if (aiResponse.assistantMessage) {
-                    twiml.say(aiResponse.assistantMessage);
-                }
+                const assistantMsg = aiResponse.assistantMessage || "I'm here to help!";
 
-                // 3. Execute actions (Only if the AI explicitly determined a task was needed)
+                // Speak the response
+                twiml.say(assistantMsg);
+
+                // Track in memory
+                session.history.push({ role: 'assistant', content: assistantMsg });
+
+                // Persist to DB
+                await SessionService.appendToSession(session.dbSessionId, session.userId, {
+                    userMessage: input,
+                    assistantMessage: assistantMsg,
+                });
+
+                // Execute any actions the AI decided on
                 if (aiResponse.actions && aiResponse.actions.length > 0) {
                     for (const action of aiResponse.actions) {
                         console.log(`🚀 Executing Action: ${action.type}`);
 
-                        switch (action.type) {
+                        try {
+                            switch (action.type) {
                             
                             // --- BOOKING & LIFESTYLE ---
                             case 'CREATE_BOOKING':
                                 // FIX: Cast the payload so TypeScript stops complaining
                                 const bookingData = {
                                     businessName: action.payload.businessName,
-                                    datetimeLocal: new Date(action.payload.datetimeLocal),
+                                    datetimeLocal: new Date(action.payload.datetimeLocal).toISOString(),
                                     partySize: Number(action.payload.partySize) || 2,
-                                    notes: action.payload.notes
+                                    notes: action.payload.notes,
+                                    sessionId: session.dbSessionId,
                                 } as any; // Force cast to satisfy Service
 
                                 await BookingService.createBooking(session.userId, bookingData);
@@ -156,10 +192,11 @@ case CallState.DISCOVERY:
                                 await prisma.activity.create({
                                 data: {
                                     userId: session.userId,
-                                    name: action.payload.title || action.payload.activityName || "New Activity",
-                                    type: action.payload.type,
-                                    durationMin: action.payload.duration || 60,
-                                    datetimeLocal: new Date(action.payload.datetime)
+                                    sessionId: session.dbSessionId,
+                                    name: action.payload.title || action.payload.activityName || action.payload.name || "New Activity",
+                                    type: action.payload.type || 'GENERAL',
+                                    durationMin: action.payload.duration || action.payload.durationMin || 60,
+                                    datetimeLocal: action.payload.datetime ? new Date(action.payload.datetime) : new Date()
                                 }
                                 });
 
@@ -236,11 +273,14 @@ case CallState.DISCOVERY:
                                 console.warn(`⚠️ Unhandled action type: ${action.type}`);
                                 break;
                         }
+                        } catch (actionErr) {
+                            console.error(`❌ Action ${action.type} failed:`, actionErr);
+                        }
                     }
                 }
             } catch (error) {
                 console.error("Error in CallState.DISCOVERY:", error);
-                twiml.say("I'm sorry, I had a bit of trouble processing that request. Could you say it again?");
+                twiml.say("I'm sorry, I had trouble processing that. Could you say it again?");
             }
             break;
 
@@ -250,7 +290,8 @@ case CallState.DISCOVERY:
       await BookingService.createBooking(session.userId, {
         businessName,
         datetimeLocal: new Date().toISOString(),
-        partySize: 2
+        partySize: 2,
+        sessionId: session.dbSessionId,
       });
 
       twiml.say(`I have created a draft booking for ${businessName}. Check your app to confirm the time.`);
@@ -264,6 +305,20 @@ case CallState.DISCOVERY:
 
   return twiml.toString();
 }
+
+  // 3. Handle call end (cleanup + persist)
+  static async handleCallEnd(callSid: string): Promise<void> {
+    const session = activeCalls[callSid];
+    if (!session) return;
+
+    try {
+      await SessionService.endSession(session.dbSessionId, session.userId, 'Voice call ended');
+    } catch (err) {
+      console.error('Error ending voice session:', err);
+    }
+
+    delete activeCalls[callSid];
+  }
 
 }
 
