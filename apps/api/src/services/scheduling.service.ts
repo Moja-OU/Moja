@@ -13,6 +13,7 @@ export class SchedulingService {
       recurrenceRule?: string;
       goalId?: string;
       sessionId?: string;
+      type?: string;
     }
   ) {
     const activity = await prisma.activity.create({
@@ -25,6 +26,7 @@ export class SchedulingService {
         goalId: data.goalId,
         sessionId: data.sessionId,
         status: 'PLANNED',
+        type: data.type || 'GENERAL',
       },
     });
 

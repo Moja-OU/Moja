@@ -300,6 +300,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
         recurrenceRule: action.payload.recurrenceRule,
         goalId: action.payload.goalId,
         sessionId,
+        type: action.payload.type,
       });
 
     case 'CREATE_GOAL':

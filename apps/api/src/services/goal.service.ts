@@ -95,6 +95,7 @@ export class GoalService {
           durationMin: 60,
           recurrenceRule: this.buildRecurrenceRule(scheduleDays),
           goalId: goal.id,
+          type: 'GOAL',
         });
 
         activities.push(activity);
