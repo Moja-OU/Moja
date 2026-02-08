@@ -226,20 +226,29 @@ app.post('/ai/execute', authMiddleware, async (req, res) => {
     });
 
     // Execute actions
+    console.log(`\n📋 AI returned ${aiResponse.actions.length} action(s), ${aiResponse.missingFields.length} missing field(s)`);
+    if (aiResponse.actions.length > 0) {
+      console.log('   Actions:', aiResponse.actions.map(a => a.type).join(', '));
+    }
+    if (aiResponse.missingFields.length > 0) {
+      console.log('   Missing:', aiResponse.missingFields.join(', '));
+    }
+
     const executedActions: any[] = [];
 
     for (const action of aiResponse.actions) {
       // Validate action
       if (!AIOrchestrator.validateAction(action)) {
-        console.warn('Invalid action skipped:', action);
+        console.warn('⚠️ Invalid action skipped:', JSON.stringify(action));
         continue;
       }
 
       try {
         const result = await executeAction(userId, action, sessionId);
         executedActions.push({ ...action, result });
+        console.log(`✅ Action ${action.type} completed successfully`);
       } catch (error) {
-        console.error('Action execution failed:', error);
+        console.error(`❌ Action ${action.type} failed:`, error);
         executedActions.push({
           ...action,
           error: error instanceof Error ? error.message : 'Execution failed',
@@ -283,58 +292,101 @@ app.post('/ai/execute', authMiddleware, async (req, res) => {
 
 // Helper function to execute actions
 async function executeAction(userId: string, action: AIAction, sessionId?: string) {
+  console.log(`\n🚀 [executeAction] Type: ${action.type}`);
+  console.log(`   Payload:`, JSON.stringify(action.payload, null, 2));
+
   switch (action.type) {
-    case 'CREATE_BOOKING':
-      return await BookingService.createBooking(userId, {
+    case 'CREATE_BOOKING': {
+      const result = await BookingService.createBooking(userId, {
         businessName: action.payload.businessName,
         businessPhone: action.payload.businessPhone,
-        datetimeLocal: action.payload.datetimeLocal,
-        partySize: action.payload.partySize,
+        datetimeLocal: action.payload.datetimeLocal || action.payload.datetime,
+        partySize: Number(action.payload.partySize) || 2,
         notes: action.payload.notes,
         sessionId,
       });
+      console.log(`   ✅ Booking created: ${result.id}`);
+      return result;
+    }
 
     case 'CONFIRM_BOOKING':
       return await BookingService.confirmBooking(action.payload.bookingId, userId);
 
-    case 'CREATE_ACTIVITY':
-      return await SchedulingService.createActivity(userId, {
-        name: action.payload.title,
-        datetimeLocal: action.payload.datetimeLocal,
-        durationMin: action.payload.durationMin,
+    case 'CREATE_ACTIVITY': {
+      // AI tool returns: name, datetime, type, duration
+      // Service expects: name, datetimeLocal, type, durationMin
+      const activityName = action.payload.name || action.payload.title || action.payload.activityName || 'New Activity';
+      const activityDatetime = action.payload.datetime || action.payload.datetimeLocal || new Date().toISOString();
+      const activityDuration = action.payload.duration || action.payload.durationMin || 60;
+      const activityType = action.payload.type || 'GENERAL';
+
+      console.log(`   Mapped: name=${activityName}, datetime=${activityDatetime}, duration=${activityDuration}, type=${activityType}`);
+
+      const result = await SchedulingService.createActivity(userId, {
+        name: activityName,
+        datetimeLocal: activityDatetime,
+        durationMin: Number(activityDuration),
         recurrenceRule: action.payload.recurrenceRule,
         goalId: action.payload.goalId,
         sessionId,
-        type: action.payload.type,
+        type: activityType,
       });
+      console.log(`   ✅ Activity created: ${result.id}`);
+      return result;
+    }
 
-    case 'CREATE_GOAL':
-      return await GoalService.createGoal(userId, {
+    case 'CREATE_GOAL': {
+      const result = await GoalService.createGoal(userId, {
         title: action.payload.title,
-        metric: action.payload.metric,
+        metric: action.payload.metric || 'general',
         targetAmount: action.payload.targetAmount,
-        frequency: action.payload.frequency,
+        frequency: action.payload.frequency || 'MONTHLY',
       });
+      console.log(`   ✅ Goal created: ${result.id}`);
+      return result;
+    }
 
     case 'GENERATE_GOAL_PLAN':
       return await GoalService.generateGoalPlan(action.payload.goalId, action.payload.preferences);
 
-    case 'SET_BUDGET':
-      return await BudgetService.createBudget(userId, {
+    case 'SET_BUDGET': {
+      // AI tool returns: category, amount, period
+      // Service expects: category, limitAmount, period
+      const result = await BudgetService.createBudget(userId, {
         category: action.payload.category,
-        period: action.payload.period,
-        limitAmount: action.payload.limitAmount,
+        period: action.payload.period || 'MONTHLY',
+        limitAmount: action.payload.limitAmount || action.payload.amount,
       });
+      console.log(`   ✅ Budget created: ${result.id}`);
+      return result;
+    }
 
-    case 'ADD_EXPENSE':
-      return await BudgetService.addExpense(userId, action.payload.budgetId, {
-        amount: action.payload.amount,
+    case 'ADD_EXPENSE': {
+      // AI tool returns: merchant, amount, category, date
+      // Service expects: budgetId, amount, merchant, note
+      // If no budgetId, try to find budget by category or create a default
+      let budgetId = action.payload.budgetId;
+      if (!budgetId && action.payload.category) {
+        const budgets = await BudgetService.getCurrentBudgets(userId);
+        const match = budgets.find((b: any) => 
+          b.category.toLowerCase() === action.payload.category.toLowerCase()
+        );
+        if (match) budgetId = match.id;
+      }
+      if (!budgetId) {
+        console.warn('   ⚠️ No budgetId and no matching category budget found — skipping expense');
+        return { skipped: true, reason: 'No budget found for expense' };
+      }
+      const result = await BudgetService.addExpense(userId, budgetId, {
+        amount: Number(action.payload.amount),
         merchant: action.payload.merchant,
-        note: action.payload.note,
+        note: action.payload.note || action.payload.category,
       });
+      console.log(`   ✅ Expense added: ${result.expense?.id}`);
+      return result;
+    }
 
     case 'EXPORT_CALENDAR_EVENT':
-      // Return event ID for calendar download
       return { eventId: action.payload.eventId, type: action.payload.type };
 
     default:

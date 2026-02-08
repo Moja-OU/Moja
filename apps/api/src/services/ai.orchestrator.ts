@@ -226,10 +226,14 @@ export class AIOrchestrator {
       // TS FIX: Re-check toolCalls for the final response
       if (toolCalls && toolCalls.length > 0) {
         const finalTool = toolCalls[0];
+        console.log(`\n🤖 AI tool call: ${finalTool.type === 'function' ? finalTool.function.name : 'unknown'}`);
 
         // TS FIX: Again, strict check for 'function' type
         if (finalTool.type === 'function' && finalTool.function.name === 'execute_actions') {
           const result = JSON.parse(finalTool.function.arguments);
+          console.log(`   assistant_message: ${result.assistant_message}`);
+          console.log(`   missing_fields: ${JSON.stringify(result.missing_fields)}`);
+          console.log(`   actions (${(result.actions || []).length}):`, JSON.stringify(result.actions, null, 2));
           return {
             assistantMessage: result.assistant_message,
             missingFields: result.missing_fields || [],
@@ -238,7 +242,7 @@ export class AIOrchestrator {
         }
       }
 
-
+      console.log(`\n🤖 AI responded with plain text (no tool call). Content: ${(responseMessage.content || '').substring(0, 100)}...`);
       return {
         assistantMessage: responseMessage.content || "I'm here to help! What's on your mind?",
         missingFields: [],
