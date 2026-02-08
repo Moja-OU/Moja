@@ -57,15 +57,15 @@ export class GoalService {
     let scheduleDays: number[]; // 0 = Sunday, 1 = Monday, etc.
 
     if (goal.frequency === 'WEEKLY') {
-      if (goal.targetValue === 3) {
+      if (goal.targetAmount === 3) {
         scheduleDays = [1, 3, 5]; // Mon, Wed, Fri
-      } else if (goal.targetValue === 2) {
+      } else if (goal.targetAmount === 2) {
         scheduleDays = [1, 4]; // Mon, Thu
-      } else if (goal.targetValue === 7) {
+      } else if (goal.targetAmount === 7) {
         scheduleDays = [0, 1, 2, 3, 4, 5, 6]; // Every day
       } else {
         // Default: spread evenly
-        scheduleDays = this.spreadDaysEvenly(goal.targetValue);
+        scheduleDays = this.spreadDaysEvenly(goal.targetAmount);
       }
     } else {
       // For now, just use 3x/week for other frequencies
@@ -169,8 +169,8 @@ export class GoalService {
     return {
       goal,
       completed: goal.streakCount,
-      target: goal.targetValue,
-      percentage: (goal.streakCount / goal.targetValue) * 100,
+      target: goal.targetAmount,
+      percentage: goal.targetAmount > 0 ? (goal.streakCount / goal.targetAmount) * 100 : 0,
     };
   }
 

@@ -183,7 +183,7 @@ case CallState.DISCOVERY:
                                     data: {
                                         userId: session.userId,
                                         title: action.payload.title,
-                                        targetValue: action.payload.targetAmount,
+                                        targetAmount: action.payload.targetAmount,
                                         targetDate: new Date(action.payload.targetDate),
                                         status: 'ACTIVE'
                                     }
