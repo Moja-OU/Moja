@@ -10,10 +10,149 @@ datasource db {
 }
 
 model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String?  @unique
+  name         String
+  passwordHash String
+  timezone     String   @default("America/Chicago")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions          Session[]
+  bookings          Booking[]
+  activities        Activity[]
+  goals             Goal[]
+  budgets           Budget[]
+  expenses          Expense[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+}
+
+model Session {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel     String    // VOICE | CHAT
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  summary     String?
+  transcript  String?
+  intentTags  String?   // JSON string
+
+  bookings   Booking[]
+  activities Activity[]
+
+  @@index([userId, startedAt])
+}
+
+model Booking {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId       String?
+  session         Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  businessName    String
+  businessPhone   String?
+  datetimeLocal   DateTime
+  partySize       Int
+  status          String    @default("DRAFT") // DRAFT|PENDING_CONFIRMATION|CONFIRMED|CANCELLED
+  calendarEventId String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, datetimeLocal])
+  @@index([userId, status])
+}
+
+model Activity {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId       String?
+  session         Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  goalId          String?
+  goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  title           String
+  datetimeLocal   DateTime
+  durationMin     Int       @default(60)
+  recurrenceRule  String?   // e.g., "WEEKLY;BYDAY=MO,WE,FR"
+  status          String    @default("PLANNED") // PLANNED|DONE|SKIPPED
+  calendarEventId String?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, datetimeLocal])
+  @@index([userId, status])
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  metric      String   // e.g., "runs/week"
+  targetValue Int
+  frequency   String   // WEEKLY|BIWEEKLY|MONTHLY
+  streakCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  activities Activity[]
+
+  @@index([userId])
+}
+
+model Budget {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        String   // FOOD|FUN|GENERAL
+  period          String   // WEEKLY|MONTHLY
+  limitAmount     Float
+  remainingAmount Float
+  startDate       DateTime @default(now())
+
+  expenses Expense[]
+
+  @@index([userId])
+}
+
+model Expense {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetId      String
+  budget        Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  amount        Float
+  merchant      String
+  datetimeLocal DateTime @default(now())
+  note          String?
+
+  @@index([userId, datetimeLocal])
+  @@index([budgetId])
+}
+
+model Notification {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String    // UPCOMING_ACTIVITY|LOW_BUDGET|BOOKING_REMINDER
+  payload      String    // JSON
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("SCHEDULED") // SCHEDULED|SENT|FAILED
+
+  @@index([userId, scheduledFor])
+  @@index([status, scheduledFor])
+}
+
+model PushSubscription {
   id        String   @id @default(uuid())
-  email     String   @unique
-  phone     String   @unique
-  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
