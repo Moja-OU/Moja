@@ -55,3 +55,6 @@ pnpm-debug.log*
 .cache/
 tmp/
 temp/
+
+# Some docs
+PERSON_B_ROADMAP.md
