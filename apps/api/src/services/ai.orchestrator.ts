@@ -1,9 +1,13 @@
-import OpenAI from 'openai';
+import { AzureOpenAI } from 'openai';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+
+// Azure OpenAI configuration
+const openai = new AzureOpenAI({
+  apiKey: process.env.AZURE_OPENAI_KEY,
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+  apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
 });
 
 export type ActionType =
