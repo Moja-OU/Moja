@@ -57,10 +57,12 @@ static async handleIncomingCall(callSid: string, fromNumber: string): Promise<st
   }
 
   // Initialize session
-  activeCalls[callSid] = {
-    userId: user.id,
-    state: CallState.AUTHENTICATION
-  };
+activeCalls[callSid] = {
+  userId: user.id,
+  state: CallState.AUTHENTICATION,
+  history: []   // REQUIRED
+};
+
 
   const gather = twiml.gather({
     input: ['dtmf', 'speech'],
@@ -152,14 +154,15 @@ case CallState.DISCOVERY:
 
                             case 'CREATE_ACTIVITY':
                                 await prisma.activity.create({
-                                    data: {
-                                        userId: session.userId,
-                                        name: action.payload.title || action.payload.activityName || "New Activity",
-                                        type: action.payload.type, // e.g. 'GYM', 'MEDITATION'
-                                        durationMinutes: action.payload.duration,
-                                        scheduledFor: new Date(action.payload.datetime)
-                                    }
+                                data: {
+                                    userId: session.userId,
+                                    name: action.payload.title || action.payload.activityName || "New Activity",
+                                    type: action.payload.type,
+                                    durationMin: action.payload.duration,
+                                    datetimeLocal: new Date(action.payload.datetime)
+                                }
                                 });
+
                                 break;
 
                             // --- FINANCE ---
@@ -175,14 +178,14 @@ case CallState.DISCOVERY:
                                 break;
 
                             case 'ADD_EXPENSE':
-                                await prisma.expense.create({
-                                    data: {
-                                        userId: session.userId,
-                                        merchant: action.payload.merchant,
-                                        amount: action.payload.amount,
-                                        category: action.payload.category,
-                                        date: new Date(action.payload.date)
-                                    }
+                               await prisma.expense.create({
+                                data: {
+                                    userId: session.userId,
+                                    budgetId: action.payload.budgetId, // required
+                                    merchant: action.payload.merchant,
+                                    amount: action.payload.amount,
+                                    datetimeLocal: new Date(action.payload.date)
+                                }
                                 });
                                 break;
 

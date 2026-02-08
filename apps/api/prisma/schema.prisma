@@ -73,13 +73,14 @@ model Activity {
   session         Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   goalId          String?
   goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  name           String
+  name            String
   datetimeLocal   DateTime
   durationMin     Int       @default(60)
   recurrenceRule  String?   // e.g., "WEEKLY;BYDAY=MO,WE,FR"
   status          String    @default("PLANNED") // PLANNED|DONE|SKIPPED
   calendarEventId String?
   createdAt       DateTime  @default(now())
+  type            String
   
 
   @@index([userId, datetimeLocal])
@@ -96,6 +97,7 @@ model Goal {
   frequency   String   // WEEKLY|BIWEEKLY|MONTHLY
   streakCount Int      @default(0)
   createdAt   DateTime @default(now())
+  category    String
 
   activities Activity[]
 
