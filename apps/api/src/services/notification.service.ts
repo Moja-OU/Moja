@@ -210,7 +210,7 @@ export class NotificationService {
           userId: budget.userId,
           type: 'LOW_BUDGET',
           payload: { contains: budget.id },
-          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // Last 24h
+          scheduledFor: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // Last 24h
         },
       });
 
