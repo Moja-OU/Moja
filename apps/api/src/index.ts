@@ -294,7 +294,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
 
     case 'CREATE_ACTIVITY':
       return await SchedulingService.createActivity(userId, {
-        title: action.payload.title,
+        name: action.payload.title,
         datetimeLocal: action.payload.datetimeLocal,
         durationMin: action.payload.durationMin,
         recurrenceRule: action.payload.recurrenceRule,
@@ -306,7 +306,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
       return await GoalService.createGoal(userId, {
         title: action.payload.title,
         metric: action.payload.metric,
-        targetValue: action.payload.targetValue,
+        targetAmount: action.payload.targetAmount,
         frequency: action.payload.frequency,
       });
 
@@ -644,7 +644,7 @@ app.post('/voice/process', async (req, res) => {
   try {
     const { CallSid, SpeechResult, Digits } = req.body;
     const xmlResponse = await VoiceService.processInput(CallSid, SpeechResult, Digits);
-    
+
     res.type('text/xml');
     res.send(xmlResponse);
   } catch (error) {

@@ -10,7 +10,7 @@ export class GoalService {
     data: {
       title: string;
       metric: string;
-      targetValue: number;
+      targetAmount: number;
       frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
     }
   ) {
@@ -19,7 +19,7 @@ export class GoalService {
         userId,
         title: data.title,
         metric: data.metric,
-        targetValue: data.targetValue,
+        targetAmount: data.targetAmount,
         frequency: data.frequency,
         streakCount: 0,
       },
@@ -90,7 +90,7 @@ export class GoalService {
         activityDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
         const activity = await SchedulingService.createActivity(goal.userId, {
-          title: goal.title,
+          name: goal.title,
           datetimeLocal: activityDate,
           durationMin: 60,
           recurrenceRule: this.buildRecurrenceRule(scheduleDays),
@@ -196,14 +196,14 @@ export class GoalService {
    */
   private static spreadDaysEvenly(count: number): number[] {
     if (count >= 7) return [0, 1, 2, 3, 4, 5, 6];
-    
+
     const days: number[] = [];
     const interval = Math.floor(7 / count);
-    
+
     for (let i = 0; i < count; i++) {
       days.push((i * interval + 1) % 7); // Start from Monday
     }
-    
+
     return days;
   }
 
