@@ -1,4 +1,4 @@
-# AI Call Center Concierge — MVP PRD + Design/Architecture (13-hour, $0 Demo)
+# AI Call Center Concierge — MVP PRD + Design/Architecture (Hacklahom)
 
 > **Scope note (critical):** A true PSTN phone-number call center usually costs money (Twilio/SignalWire/etc.).  
 > This MVP demos the *call-center experience* using **voice-in-web** (optional) and a **tel: handoff** for “call transfer,” while delivering the full booking/scheduling/goals/budgeting dashboard experience.
