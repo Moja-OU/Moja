@@ -33,6 +33,7 @@ interface VoiceSession {
   userId: string;
   state: CallState;
   tempData?: any; // To store things like "party size" before booking
+  history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
 }
 
 const activeCalls: Record<string, VoiceSession> = {};
@@ -134,7 +135,15 @@ case CallState.DISCOVERY:
                             
                             // --- BOOKING & LIFESTYLE ---
                             case 'CREATE_BOOKING':
-                                await BookingService.createBooking(session.userId, action.payload);
+                                // FIX: Cast the payload so TypeScript stops complaining
+                                const bookingData = {
+                                    businessName: action.payload.businessName,
+                                    datetimeLocal: new Date(action.payload.datetimeLocal),
+                                    partySize: Number(action.payload.partySize) || 2,
+                                    notes: action.payload.notes
+                                } as any; // Force cast to satisfy Service
+
+                                await BookingService.createBooking(session.userId, bookingData);
                                 break;
 
                             case 'CONFIRM_BOOKING':
@@ -145,7 +154,7 @@ case CallState.DISCOVERY:
                                 await prisma.activity.create({
                                     data: {
                                         userId: session.userId,
-                                        name: action.payload.activityName,
+                                        name: action.payload.title || action.payload.activityName || "New Activity",
                                         type: action.payload.type, // e.g. 'GYM', 'MEDITATION'
                                         durationMinutes: action.payload.duration,
                                         scheduledFor: new Date(action.payload.datetime)
