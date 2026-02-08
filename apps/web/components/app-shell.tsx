@@ -24,6 +24,7 @@ const navItems: { id: ViewType; label: string; icon: typeof LayoutDashboard }[] 
 interface AppShellProps {
   currentView: ViewType
   onViewChange: (view: ViewType) => void
+  onLogout?: () => void
   children: ReactNode
 }
 
@@ -31,10 +32,12 @@ function SidebarContent({
   currentView,
   onViewChange,
   onItemClick,
+  onLogout,
 }: {
   currentView: ViewType
   onViewChange: (view: ViewType) => void
   onItemClick?: () => void
+  onLogout?: () => void
 }) {
   return (
     <div className="flex flex-col h-full">
@@ -43,8 +46,8 @@ function SidebarContent({
           <Headphones className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-sm font-semibold text-foreground leading-tight">AI Concierge</h1>
-          <p className="text-[11px] text-muted-foreground leading-tight">Call Center</p>
+          <h1 className="text-sm font-semibold text-foreground leading-tight">UmojaLife</h1>
+          <p className="text-[11px] text-muted-foreground leading-tight">Plan. Budget. Achieve</p>
         </div>
       </div>
 
@@ -79,20 +82,30 @@ function SidebarContent({
       </nav>
 
       <div className="px-4 py-4 border-t border-border">
+        {onLogout && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLogout}
+            className="w-full justify-start text-muted-foreground hover:text-foreground mb-2"
+          >
+            Logout
+          </Button>
+        )}
         <p className="text-[11px] text-muted-foreground">Fast demo mode (no real PSTN)</p>
       </div>
     </div>
   )
 }
 
-export function AppShell({ currentView, onViewChange, children }: AppShellProps) {
+export function AppShell({ currentView, onViewChange, onLogout, children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:w-60 md:shrink-0 flex-col border-r border-border bg-card">
-        <SidebarContent currentView={currentView} onViewChange={onViewChange} />
+        <SidebarContent currentView={currentView} onViewChange={onViewChange} onLogout={onLogout} />
       </aside>
 
       {/* Mobile sidebar drawer */}
@@ -103,6 +116,7 @@ export function AppShell({ currentView, onViewChange, children }: AppShellProps)
             currentView={currentView}
             onViewChange={onViewChange}
             onItemClick={() => setMobileOpen(false)}
+            onLogout={onLogout}
           />
         </SheetContent>
       </Sheet>

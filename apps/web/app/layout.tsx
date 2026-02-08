@@ -8,8 +8,8 @@ const _inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const _jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' })
 
 export const metadata: Metadata = {
-  title: 'AI Call Center Concierge',
-  description: 'Voice-first AI call center for booking, scheduling, goals, and budgeting',
+  title: 'UmojaLife - Plan. Budget. Achieve',
+  description: 'Unified AI Concierge to help you Plan, Budget, and Achieve.',
 }
 
 export const viewport: Viewport = {

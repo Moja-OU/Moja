@@ -15,6 +15,7 @@ model User {
   phone        String?  @unique
   name         String
   passwordHash String
+  voicePin     String?  // Optional 4-digit PIN for voice authentication
   timezone     String   @default("America/Chicago")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -30,15 +31,16 @@ model User {
 }
 
 model Session {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel     String    // VOICE | CHAT
-  startedAt   DateTime  @default(now())
-  endedAt     DateTime?
-  summary     String?
-  transcript  String?
-  intentTags  String?   // JSON string
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel        String    // VOICE | CHAT
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+  summary        String?
+  transcript     String?   // JSON array: [{role, content, timestamp}]
+  intentTags     String?   // JSON string
+  twilioCallSid  String?   // Twilio Call SID for voice sessions
 
   bookings   Booking[]
   activities Activity[]
