@@ -62,7 +62,7 @@ A voice-first AI “call center” that helps users:
 ### 2.1 High-level architecture
 **Web App (Next.js)**  
 ↕ (REST/JSON)  
-**API Server (FastAPI or Node/Express)**  
+**API Server (Node/Express)**  
 - Auth
 - DB CRUD
 - Notification scheduler
@@ -120,7 +120,7 @@ A voice-first AI “call center” that helps users:
   - `actions_executed[]`
   - updated `dashboard_snapshot`
 
-#### B) Backend (FastAPI or Express)
+#### B) Backend ( Express)
 Services (logical modules):
 1. Auth Service
 2. AI Orchestrator
