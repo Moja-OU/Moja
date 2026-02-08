@@ -1,0 +1,12 @@
+// Prisma schema for Moja
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// TODO: Add your models here
