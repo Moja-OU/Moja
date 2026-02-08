@@ -190,6 +190,8 @@ Be conversational but precise. Confirm actions clearly.`;
    * Validate action payload
    */
   static validateAction(action: AIAction): boolean {
+    if (!action.payload) return false;
+
     switch (action.type) {
       case 'CREATE_BOOKING':
         return !!(
