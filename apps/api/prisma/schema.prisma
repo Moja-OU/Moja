@@ -88,20 +88,20 @@ model Activity {
 }
 
 model Goal {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  metric      String   // e.g., "runs/week"
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  metric       String?
   targetAmount Float
-  frequency   String   // WEEKLY|BIWEEKLY|MONTHLY
-  streakCount Int      @default(0)
-  createdAt   DateTime @default(now())
-  category    String
+  targetDate   DateTime?   // ADD
+  frequency    String?
+  status       String   @default("ACTIVE") // ADD
+  streakCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  category     String?
 
   activities Activity[]
-
-  @@index([userId])
 }
 
 model Budget {
@@ -160,10 +160,11 @@ model PushSubscription {
   @@index([userId])
 }
 
-model Reminder { // <--- Add this entire model (Fixes TS2305)
+model Reminder {
   id       String   @id @default(cuid())
   userId   String
   title    String
   remindAt DateTime
+  priority String   @default("NORMAL")
   isSent   Boolean  @default(false)
 }

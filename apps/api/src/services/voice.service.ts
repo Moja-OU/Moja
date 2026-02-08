@@ -158,10 +158,11 @@ case CallState.DISCOVERY:
                                     userId: session.userId,
                                     name: action.payload.title || action.payload.activityName || "New Activity",
                                     type: action.payload.type,
-                                    durationMin: action.payload.duration,
+                                    durationMin: action.payload.duration || 60,
                                     datetimeLocal: new Date(action.payload.datetime)
                                 }
                                 });
+
 
                                 break;
 
@@ -192,14 +193,16 @@ case CallState.DISCOVERY:
                             // --- GOALS & PRODUCTIVITY ---
                             case 'CREATE_GOAL':
                                 await prisma.goal.create({
-                                    data: {
-                                        userId: session.userId,
-                                        title: action.payload.title,
-                                        targetAmount: action.payload.targetAmount,
-                                        targetDate: new Date(action.payload.targetDate),
-                                        status: 'ACTIVE'
-                                    }
+                                data: {
+                                    userId: session.userId,
+                                    title: action.payload.title,
+                                    metric: action.payload.metric || "general",
+                                    targetAmount: action.payload.targetAmount,
+                                    frequency: action.payload.frequency || "MONTHLY",
+                                    category: action.payload.category || "GENERAL"
+                                }
                                 });
+
                                 break;
 
                             case 'GENERATE_GOAL_PLAN':
@@ -209,14 +212,14 @@ case CallState.DISCOVERY:
 
                             case 'CREATE_REMINDER':
                                 await prisma.reminder.create({
-                                    data: {
-                                        userId: session.userId,
-                                        title: action.payload.title,
-                                        remindAt: new Date(action.payload.datetime),
-                                        priority: action.payload.priority || 'NORMAL',
-                                        isSent: false
-                                    }
+                                data: {
+                                    userId: session.userId,
+                                    title: action.payload.title,
+                                    remindAt: new Date(action.payload.datetime),
+                                    isSent: false
+                                }
                                 });
+
                                 break;
 
                           /*  case 'EXPORT_CALENDAR_EVENT':
