@@ -107,8 +107,13 @@ static async processInput(callSid: string, speechResult: string, digits: string)
 
   switch (session.state) {
     case CallState.AUTHENTICATION:
-      // ✅ Use DB passwordHash (temporary PIN) for validation
-      if (user.passwordHash === input) {
+      // ✅ Use voicePin field for voice authentication
+      console.log('🔐 PIN Authentication attempt:');
+      console.log('   Expected (voicePin):', user.voicePin, 'Type:', typeof user.voicePin);
+      console.log('   Received (input):', input, 'Type:', typeof input);
+      console.log('   Match:', user.voicePin === input);
+      
+      if (user.voicePin && user.voicePin === input) {
         session.state = CallState.DISCOVERY;
         const greeting = 'Identity verified. How can I help you today?';
         twiml.say(greeting);
@@ -189,15 +194,18 @@ case CallState.DISCOVERY:
                                 break;
 
                             case 'CREATE_ACTIVITY':
+                                const activityName = action.payload?.name || action.payload?.title || action.payload?.activityName || "New Activity";
+                                const activityDateTime = action.payload?.datetime ? new Date(action.payload.datetime) : new Date();
+                                
                                 await prisma.activity.create({
-                                data: {
-                                    userId: session.userId,
-                                    sessionId: session.dbSessionId,
-                                    name: action.payload.title || action.payload.activityName || action.payload.name || "New Activity",
-                                    type: action.payload.type || 'GENERAL',
-                                    durationMin: action.payload.duration || action.payload.durationMin || 60,
-                                    datetimeLocal: action.payload.datetime ? new Date(action.payload.datetime) : new Date()
-                                }
+                                    data: {
+                                        userId: session.userId,
+                                        sessionId: session.dbSessionId,
+                                        name: activityName,
+                                        type: action.payload?.type || 'GENERAL',
+                                        durationMin: action.payload?.duration || action.payload?.durationMin || 60,
+                                        datetimeLocal: activityDateTime
+                                    }
                                 });
 
 

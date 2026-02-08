@@ -4,9 +4,10 @@ const prisma = new PrismaClient();
 async function main() {
   const user = await prisma.user.update({
     where: { email: 'test@moja.com' },
-    data: { name: 'Luc' },  
+    data: { voicePin: '1234' }
   });
-  console.log('✅ Updated user name to:', user.name);
+  
+  console.log('✅ Set voice PIN to 1234 for', user.email);
 }
 
 main()

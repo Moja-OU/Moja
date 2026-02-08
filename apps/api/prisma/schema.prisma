@@ -15,6 +15,7 @@ model User {
   phone        String?  @unique
   name         String
   passwordHash String
+  voicePin     String?  // Optional 4-digit PIN for voice authentication
   timezone     String   @default("America/Chicago")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

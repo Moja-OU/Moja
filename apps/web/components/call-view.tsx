@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -16,13 +17,14 @@ import {
   BarChart3,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { mockChatMessages, type ChatMessage } from "@/lib/mock-data"
+import { type ChatMessage } from "@/lib/mock-data"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { APIClient } from "@/lib/api"
 
 const quickReplies = [
   "Book dinner at The Library tomorrow at 7pm for 2",
@@ -109,8 +111,30 @@ function TransferCTA() {
   )
 }
 
-function ActionsPanel() {
+function ActionsPanel({ 
+  actions = [],
+  missingFields = [],
+  dashboardSnapshot 
+}: { 
+  actions?: any[]
+  missingFields?: string[]
+  dashboardSnapshot?: any
+}) {
   const [isOpen, setIsOpen] = useState(true)
+  
+  const snapshotItems = dashboardSnapshot ? [
+    { label: "Bookings", value: `${dashboardSnapshot.upcomingBookings?.length || 0} upcoming` },
+    { label: "Activities", value: `${dashboardSnapshot.upcomingActivities?.length || 0} planned` },
+    { label: "Goals", value: `${dashboardSnapshot.goals?.length || 0} active` },
+    { label: "Budget", value: dashboardSnapshot.budgets?.[0] ? 
+      `$${dashboardSnapshot.budgets[0].remainingAmount} / $${dashboardSnapshot.budgets[0].limitAmount}` : "N/A" },
+  ] : [
+    { label: "Bookings", value: "Loading..." },
+    { label: "Activities", value: "Loading..." },
+    { label: "Goals", value: "Loading..." },
+    { label: "Budget", value: "Loading..." },
+  ]
+  
   return (
     <div
       className={cn(
@@ -141,25 +165,27 @@ function ActionsPanel() {
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
-              {sampleActions.map((a) => (
-                <div
-                  key={a.type}
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/70 text-xs"
-                >
-                  <span className="font-mono text-foreground/80">{a.type}</span>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "border-0 text-[10px]",
-                      a.status === "executed"
-                        ? "bg-success/15 text-success"
-                        : "bg-warning/15 text-warning"
-                    )}
+              {actions.length === 0 ? (
+                <p className="text-xs text-muted-foreground/70 italic px-2.5">No actions yet</p>
+              ) : (
+                actions.map((a, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-secondary/70 text-xs"
                   >
-                    {a.status}
-                  </Badge>
-                </div>
-              ))}
+                    <span className="font-mono text-foreground/80">{a.type}</span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "border-0 text-[10px]",
+                        a.error ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"
+                      )}
+                    >
+                      {a.error ? "failed" : "executed"}
+                    </Badge>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -171,12 +197,12 @@ function ActionsPanel() {
                 Missing Fields
               </p>
             </div>
-            {sampleMissing.length === 0 ? (
+            {missingFields.length === 0 ? (
               <p className="text-xs text-muted-foreground/70 italic px-2.5">None - all clear</p>
             ) : (
               <div className="flex flex-col gap-1">
-                {sampleMissing.map((f) => (
-                  <span key={f} className="text-xs text-warning px-2.5">{f}</span>
+                {missingFields.map((f, idx) => (
+                  <span key={idx} className="text-xs text-warning px-2.5">{f}</span>
                 ))}
               </div>
             )}
@@ -206,10 +232,42 @@ function ActionsPanel() {
 }
 
 export function CallView() {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages)
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      content: "Hi! I'm your Moja AI assistant. I can help you book reservations, plan activities, set goals, and manage your budget. What would you like to do today?"
+    }
+  ])
   const [input, setInput] = useState("")
-  const [showTransfer, setShowTransfer] = useState(true)
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [actions, setActions] = useState<any[]>([])
+  const [missingFields, setMissingFields] = useState<string[]>([])
+  const [dashboardSnapshot, setDashboardSnapshot] = useState<any>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Initialize session on mount
+  useEffect(() => {
+    const initSession = async () => {
+      try {
+        const response = await APIClient.startSession('CHAT')
+        setSessionId(response.session.id)
+      } catch (error) {
+        toast.error("Failed to start session")
+        console.error(error)
+      }
+    }
+    initSession()
+
+    // Cleanup: end session on unmount
+    return () => {
+      if (sessionId) {
+        APIClient.endSession(sessionId, "User left chat view").catch(console.error)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -217,8 +275,9 @@ export function CallView() {
     }
   }, [messages])
 
-  const sendMessage = () => {
-    if (!input.trim()) return
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return
+    
     const userMsg: ChatMessage = {
       id: `m${Date.now()}`,
       role: "user",
@@ -226,17 +285,40 @@ export function CallView() {
     }
     setMessages((prev) => [...prev, userMsg])
     setInput("")
+    setIsLoading(true)
 
-    // Simulated assistant response
-    setTimeout(() => {
-      const response: ChatMessage = {
+    try {
+      const response = await APIClient.executeAI(userMsg.content, sessionId || undefined, {
+        recentMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content }))
+      })
+
+      const assistantMsg: ChatMessage = {
         id: `m${Date.now() + 1}`,
         role: "assistant",
-        content: getSimulatedResponse(input.trim()),
-        actions: getSimulatedActions(input.trim()),
+        content: response.assistantMessage,
+        actions: response.actions?.map((a: any) => a.type)
       }
-      setMessages((prev) => [...prev, response])
-    }, 800)
+      
+      setMessages((prev) => [...prev, assistantMsg])
+      setActions(response.actions || [])
+      setMissingFields(response.missingFields || [])
+      setDashboardSnapshot(response.dashboardSnapshot)
+      
+      // Show transfer CTA if booking was created
+      if (response.actions?.some((a: any) => a.type === 'CREATE_BOOKING')) {
+        setShowTransfer(true)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send message")
+      const errorMsg: ChatMessage = {
+        id: `m${Date.now() + 1}`,
+        role: "assistant",
+        content: "Sorry, I encountered an error processing your request. Please try again."
+      }
+      setMessages((prev) => [...prev, errorMsg])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleQuickReply = (text: string) => {
@@ -298,13 +380,15 @@ export function CallView() {
               placeholder="Type your message..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+              onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
+              disabled={isLoading}
               className="flex-1 bg-secondary border-border text-foreground placeholder:text-muted-foreground h-10"
             />
             <Button
               size="icon"
               className="h-10 w-10 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
               onClick={sendMessage}
+              disabled={isLoading}
               aria-label="Send message"
             >
               <Send className="h-4 w-4" />
@@ -315,38 +399,12 @@ export function CallView() {
 
       {/* Actions panel - hidden on mobile */}
       <div className="hidden lg:flex">
-        <ActionsPanel />
+        <ActionsPanel 
+          actions={actions}
+          missingFields={missingFields}
+          dashboardSnapshot={dashboardSnapshot}
+        />
       </div>
     </div>
   )
-}
-
-function getSimulatedResponse(input: string): string {
-  const lower = input.toLowerCase()
-  if (lower.includes("book") || lower.includes("dinner") || lower.includes("restaurant")) {
-    return "I've created a booking for you. You can use the Transfer button to call the restaurant and confirm, or click \"Confirmed\" once done."
-  }
-  if (lower.includes("goal") || lower.includes("run")) {
-    return "I've set up your running goal and created a weekly plan with sessions on Monday, Wednesday, and Friday at 7:00 AM. Your streak tracker is now active!"
-  }
-  if (lower.includes("budget") || lower.includes("set")) {
-    return "Your weekly food budget has been set to $60. I'll alert you when it drops below 20%."
-  }
-  if (lower.includes("add") && (lower.includes("$") || lower.includes("chipotle") || lower.includes("expense"))) {
-    return "Added the expense! Your remaining budget has been updated. Check the dashboard for the latest balance."
-  }
-  if (lower.includes("confirm")) {
-    return "Great, your booking is now confirmed! I've generated a calendar event for you. You can download the .ics file from the dashboard."
-  }
-  return "I understand. Let me help you with that. Could you provide more details about what you'd like to do?"
-}
-
-function getSimulatedActions(input: string): string[] | undefined {
-  const lower = input.toLowerCase()
-  if (lower.includes("book") || lower.includes("dinner")) return ["CREATE_BOOKING"]
-  if (lower.includes("goal") || lower.includes("run")) return ["CREATE_GOAL", "GENERATE_GOAL_PLAN"]
-  if (lower.includes("budget") || lower.includes("set")) return ["SET_BUDGET"]
-  if (lower.includes("add") && lower.includes("$")) return ["ADD_EXPENSE"]
-  if (lower.includes("confirm")) return ["CONFIRM_BOOKING", "EXPORT_CALENDAR_EVENT"]
-  return undefined
 }

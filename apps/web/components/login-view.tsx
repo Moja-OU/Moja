@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Headphones } from "lucide-react"
+import { APIClient } from "@/lib/api"
 
 interface LoginViewProps {
   onLogin: () => void
@@ -14,6 +16,51 @@ interface LoginViewProps {
 export function LoginView({ onLogin }: LoginViewProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      toast.error("Please enter email and password")
+      return
+    }
+
+    // Basic email validation
+    if (!email.includes('@')) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await APIClient.login(email, password)
+      toast.success("Login successful!")
+      onLogin()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Login failed")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDemoLogin = async () => {
+    setIsLoading(true)
+    try {
+      // Use test credentials
+      await APIClient.login("test@moja.com", "1234")
+      toast.success("Demo login successful!")
+      onLogin()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Demo login failed")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isLoading) {
+      handleLogin()
+    }
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-background">
@@ -35,9 +82,11 @@ export function LoginView({ onLogin }: LoginViewProps) {
             <Input
               id="email"
               type="email"
-              placeholder="demo@example.com"
+              placeholder="test@moja.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
               className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
@@ -49,15 +98,18 @@ export function LoginView({ onLogin }: LoginViewProps) {
               placeholder="Enter password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
               className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Button
             variant="outline"
             className="w-full border-border text-foreground hover:bg-secondary bg-transparent"
-            onClick={onLogin}
+            onClick={handleLogin}
+            disabled={isLoading}
           >
-            Login
+            {isLoading ? "Logging in..." : "Login"}
           </Button>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -69,9 +121,10 @@ export function LoginView({ onLogin }: LoginViewProps) {
           </div>
           <Button
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
-            onClick={onLogin}
+            onClick={handleDemoLogin}
+            disabled={isLoading}
           >
-            Demo Login
+            {isLoading ? "Logging in..." : "Demo Login"}
           </Button>
           <p className="text-center text-[11px] text-muted-foreground">
             Fast demo mode (no real PSTN)

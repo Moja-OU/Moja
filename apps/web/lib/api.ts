@@ -42,6 +42,15 @@ export class APIClient {
     });
 
     if (!response.ok) {
+      // Handle token expiration - auto logout
+      if (response.status === 401) {
+        this.clearToken();
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        throw new Error('Session expired. Please login again.');
+      }
+
       const error = await response.json().catch(() => ({ error: 'Request failed' }));
       throw new Error(error.error || `HTTP ${response.status}`);
     }
@@ -124,5 +133,67 @@ export class APIClient {
       method: 'PATCH',
       body: JSON.stringify({ status: 'SKIPPED' }),
     });
+  }
+
+  // Expenses
+  static async addExpense(budgetId: string, data: { amount: number; merchant: string; note?: string }) {
+    return this.request('/expenses', {
+      method: 'POST',
+      body: JSON.stringify({ budgetId, ...data }),
+    });
+  }
+
+  // Sessions
+  static async getSessionDetails(sessionId: string) {
+    return this.request(`/sessions/${sessionId}`);
+  }
+
+  static async getSessions() {
+    return this.request('/sessions');
+  }
+
+  // Goals
+  static async generateGoalPlan(goalId: string, preferences?: any) {
+    return this.request(`/goals/${goalId}/plan`, {
+      method: 'POST',
+      body: JSON.stringify({ preferences }),
+    });
+  }
+
+  // Calendar Export
+  static async exportBookingCalendar(bookingId: string): Promise<Blob> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/calendar/booking/${bookingId}.ics`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export calendar');
+    }
+
+    return response.blob();
+  }
+
+  static async exportActivityCalendar(activityId: string): Promise<Blob> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/calendar/activity/${activityId}.ics`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export calendar');
+    }
+
+    return response.blob();
   }
 }

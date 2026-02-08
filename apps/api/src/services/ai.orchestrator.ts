@@ -130,10 +130,11 @@ export class AIOrchestrator {
                     payload: { 
                       type: 'object',
                       description: `The data required for the action. 
-                        - CREATE_BOOKING: { businessName, address, datetimeLocal (ISO string), partySize, specialRequests }
+                        - CREATE_BOOKING: { businessName, datetimeLocal (ISO string), partySize, notes }
+                        - CREATE_ACTIVITY: { name, datetime (ISO string), type (EXERCISE/SOCIAL/WORK/GENERAL), duration (minutes) }
                         - SET_BUDGET: { category, amount, period (MONTHLY/WEEKLY) }
                         - ADD_EXPENSE: { merchant, amount, category, date }
-                        - CREATE_REMINDER: { title, datetime, priority }
+                        - CREATE_REMINDER: { title, datetime (ISO string), priority }
                         - CREATE_GOAL: { title, targetDate, targetAmount }
                         - GENERATE_GOAL_PLAN: { goalId, milestones }
                       `

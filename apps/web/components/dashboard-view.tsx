@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,17 +23,15 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
-  mockSessions,
-  mockBookings,
-  mockActivities,
-  mockGoals,
-  mockBudgets,
-  mockExpenses,
   type Session,
   type Booking,
   type Activity,
+  type Goal,
+  type Budget,
+  type Expense,
 } from "@/lib/mock-data"
 import { SessionDetailModal } from "@/components/session-detail-modal"
+import { APIClient } from "@/lib/api"
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { className: string; label: string }> = {
@@ -65,15 +64,25 @@ function formatDateTime(iso: string) {
   })
 }
 
-function SummaryCards() {
-  const upcomingBookings = mockBookings.filter(
+function SummaryCards({ 
+  bookings = [], 
+  activities = [], 
+  goals = [], 
+  budgets = [] 
+}: { 
+  bookings?: Booking[]
+  activities?: Activity[]
+  goals?: Goal[]
+  budgets?: Budget[]
+}) {
+  const upcomingBookings = bookings.filter(
     (b) => b.status !== "CANCELLED"
   ).length
-  const upcomingActivities = mockActivities.filter(
+  const upcomingActivities = activities.filter(
     (a) => a.status === "PLANNED"
   ).length
-  const topStreak = mockGoals.reduce((max, g) => Math.max(max, g.streakCount), 0)
-  const budget = mockBudgets[0]
+  const topStreak = goals.reduce((max, g) => Math.max(max, g.streakCount), 0)
+  const budget = budgets[0]
 
   const cards = [
     {
@@ -124,14 +133,23 @@ function SummaryCards() {
   )
 }
 
-function SessionsCard({ onViewSession }: { onViewSession: (s: Session) => void }) {
+function SessionsCard({ 
+  sessions = [], 
+  onViewSession 
+}: { 
+  sessions?: Session[]
+  onViewSession: (s: Session) => void 
+}) {
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-foreground">Recent Sessions</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {mockSessions.map((s) => (
+        {sessions.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">No sessions yet</p>
+        ) : (
+          sessions.map((s) => (
           <div key={s.id} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50">
             <div className="flex items-center justify-center h-8 w-8 rounded-md bg-secondary shrink-0 mt-0.5">
               {s.channel === "VOICE" ? (
@@ -161,19 +179,38 @@ function SessionsCard({ onViewSession }: { onViewSession: (s: Session) => void }
               Details
             </Button>
           </div>
-        ))}
+        )))}
       </CardContent>
     </Card>
   )
 }
 
-function BookingsCard() {
-  const [bookings, setBookings] = useState<Booking[]>(mockBookings)
+function BookingsCard({ bookings = [], onUpdate }: { bookings?: Booking[], onUpdate?: () => void }) {
+  const handleConfirm = async (id: string) => {
+    try {
+      await APIClient.confirmBooking(id)
+      toast.success("Booking confirmed!")
+      onUpdate?.()
+    } catch (error) {
+      toast.error("Failed to confirm booking")
+    }
+  }
 
-  const handleConfirm = (id: string) => {
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: "CONFIRMED" as const } : b))
-    )
+  const handleExportCalendar = async (id: string) => {
+    try {
+      const blob = await APIClient.exportBookingCalendar(id)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `booking-${id}.ics`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success("Calendar file downloaded!")
+    } catch (error) {
+      toast.error("Failed to export calendar")
+    }
   }
 
   return (
@@ -182,7 +219,10 @@ function BookingsCard() {
         <CardTitle className="text-sm font-semibold text-foreground">Upcoming Bookings</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {bookings.map((b) => (
+        {bookings.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">No bookings yet</p>
+        ) : (
+          bookings.map((b) => (
           <div key={b.id} className="p-3 rounded-lg bg-secondary/50">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold text-foreground">{b.businessName}</h4>
@@ -215,25 +255,29 @@ function BookingsCard() {
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => handleExportCalendar(b.id)}
               >
                 <Download className="h-3 w-3 mr-1" />
                 Download .ics
               </Button>
             </div>
           </div>
-        ))}
+        ))
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function ActivitiesCard() {
-  const [activities, setActivities] = useState<Activity[]>(mockActivities)
-
-  const markDone = (id: string) => {
-    setActivities((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "DONE" as const } : a))
-    )
+function ActivitiesCard({ activities = [], onUpdate }: { activities?: Activity[], onUpdate?: () => void }) {
+  const markDone = async (id: string) => {
+    try {
+      await APIClient.markActivityDone(id)
+      toast.success("Activity marked as done!")
+      onUpdate?.()
+    } catch (error) {
+      toast.error("Failed to update activity")
+    }
   }
 
   return (
@@ -242,7 +286,10 @@ function ActivitiesCard() {
         <CardTitle className="text-sm font-semibold text-foreground">Upcoming Activities</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        {activities.map((a) => (
+        {activities.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">No activities yet</p>
+        ) : (
+          activities.map((a) => (
           <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
@@ -268,20 +315,24 @@ function ActivitiesCard() {
               </Button>
             )}
           </div>
-        ))}
+        ))
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function GoalsCard() {
+function GoalsCard({ goals = [] }: { goals?: Goal[] }) {
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-foreground">Goals / Streaks</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {mockGoals.map((g) => (
+        {goals.length === 0 ? (
+          <p className="text-xs text-muted-foreground italic">No goals yet</p>
+        ) : (
+          goals.map((g) => (
           <div key={g.id} className="p-3 rounded-lg bg-secondary/50">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold text-foreground">{g.title}</h4>
@@ -301,39 +352,35 @@ function GoalsCard() {
               Generate plan
             </Button>
           </div>
-        ))}
+        ))
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function BudgetCard() {
-  const [budget, setBudget] = useState(mockBudgets[0])
-  const [expenses, setExpenses] = useState(mockExpenses)
+function BudgetCard({ budgets = [], expenses = [], onUpdate }: { budgets?: Budget[], expenses?: Expense[], onUpdate?: () => void }) {
   const [merchant, setMerchant] = useState("")
   const [amount, setAmount] = useState("")
+  const budget = budgets[0]
 
   const percentage = budget ? (budget.remainingAmount / budget.limitAmount) * 100 : 0
   const isLow = percentage < 30
 
-  const addExpense = () => {
+  const addExpense = async () => {
     if (!merchant || !amount || !budget) return
     const amt = parseFloat(amount)
     if (Number.isNaN(amt) || amt <= 0) return
-    const newExpense = {
-      id: `e${expenses.length + 1}`,
-      budgetId: budget.id,
-      amount: amt,
-      merchant,
-      datetimeLocal: new Date().toISOString(),
-      note: "",
+    
+    try {
+      await APIClient.addExpense(budget.id, { amount: amt, merchant })
+      toast.success("Expense added!")
+      setMerchant("")
+      setAmount("")
+      onUpdate?.()
+    } catch (error) {
+      toast.error("Failed to add expense")
     }
-    setExpenses((prev) => [...prev, newExpense])
-    setBudget((prev) =>
-      prev ? { ...prev, remainingAmount: Math.max(0, prev.remainingAmount - amt) } : prev
-    )
-    setMerchant("")
-    setAmount("")
   }
 
   if (!budget) return null
@@ -403,6 +450,43 @@ function BudgetCard() {
 
 export function DashboardView() {
   const [selectedSession, setSelectedSession] = useState<Session | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true)
+      const data = await APIClient.getDashboard()
+      setSessions(data.sessions || [])
+      setBookings(data.upcomingBookings || [])
+      setActivities(data.upcomingActivities || [])
+      setGoals(data.goals || [])
+      setBudgets(data.budgetSnapshot?.budgets || [])
+      setExpenses(data.budgetSnapshot?.recentExpenses || [])
+    } catch (error) {
+      toast.error("Failed to load dashboard")
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-muted-foreground">Loading dashboard...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 lg:p-6 flex flex-col gap-6">
@@ -412,17 +496,22 @@ export function DashboardView() {
         </p>
       </div>
 
-      <SummaryCards />
+      <SummaryCards 
+        bookings={bookings}
+        activities={activities}
+        goals={goals}
+        budgets={budgets}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SessionsCard onViewSession={setSelectedSession} />
-        <BookingsCard />
+        <SessionsCard sessions={sessions} onViewSession={setSelectedSession} />
+        <BookingsCard bookings={bookings} onUpdate={fetchData} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <ActivitiesCard />
-        <GoalsCard />
-        <BudgetCard />
+        <ActivitiesCard activities={activities} onUpdate={fetchData} />
+        <GoalsCard goals={goals} />
+        <BudgetCard budgets={budgets} expenses={expenses} onUpdate={fetchData} />
       </div>
 
       <SessionDetailModal
