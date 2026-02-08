@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/database';
 import { SchedulingService } from './scheduling.service';
-
-const prisma = new PrismaClient();
 
 export class GoalService {
   /**

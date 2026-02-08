@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/database';
 import webpush from 'web-push';
-
-const prisma = new PrismaClient();
 
 // Initialize web push with VAPID keys
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {

@@ -3,6 +3,7 @@
 
 $baseUrl = "http://localhost:4000"
 $headers = @{ "Content-Type" = "application/json" }
+$errorCount = 0
 
 Write-Host ""
 Write-Host "=== Moja API Test Suite ===" -ForegroundColor Cyan
@@ -15,6 +16,7 @@ try {
     Write-Host "   [OK] Health: $($response.status)" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] Health check failed: $_" -ForegroundColor Red
+    $errorCount++
     exit 1
 }
 
@@ -29,6 +31,7 @@ try {
     Write-Host "   [OK] User ID: $userId" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] Demo user creation failed: $_" -ForegroundColor Red
+    $errorCount++
     exit 1
 }
 
@@ -52,6 +55,7 @@ try {
     Write-Host "   [OK] Actions: $($aiResponse.actions.Count)" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] AI execution failed: $_" -ForegroundColor Red
+    $errorCount++
 }
 
 # 4. Get Dashboard
@@ -65,6 +69,7 @@ try {
     Write-Host "   [OK] Current budgets: $($dashboard.currentBudgets.Count)" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] Dashboard failed: $_" -ForegroundColor Red
+    $errorCount++
 }
 
 # 5. Create Manual Booking
@@ -84,6 +89,7 @@ try {
     Write-Host "   [OK] Booking ID: $bookingId" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] Booking creation failed: $_" -ForegroundColor Red
+    $errorCount++
 }
 
 # 6. Get Upcoming Bookings
@@ -97,6 +103,7 @@ try {
     }
 } catch {
     Write-Host "   [FAIL] Get bookings failed: $_" -ForegroundColor Red
+    $errorCount++
 }
 
 # 7. Confirm Booking
@@ -112,6 +119,7 @@ if ($bookingId) {
         Write-Host "   [OK] Booking confirmed: $($result.booking.status)" -ForegroundColor Green
     } catch {
         Write-Host "   [FAIL] Booking confirmation failed: $_" -ForegroundColor Red
+        $errorCount++
     }
 }
 
@@ -124,6 +132,7 @@ if ($bookingId) {
         Write-Host "   [OK] ICS file generated" -ForegroundColor Green
     } catch {
         Write-Host "   [FAIL] Calendar export failed: $_" -ForegroundColor Red
+        $errorCount++
     }
 }
 
@@ -142,6 +151,7 @@ try {
     Write-Host "   [OK] Activity created: $($result.activity.title)" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] Activity creation failed: $_" -ForegroundColor Red
+    $errorCount++
 }
 
 # 10. Create Goal
@@ -160,9 +170,14 @@ try {
     Write-Host "   [OK] Goal created: $($result.goal.title)" -ForegroundColor Green
 } catch {
     Write-Host "   [FAIL] Goal creation failed: $_" -ForegroundColor Red
+    $errorCount++
 }
 
 Write-Host ""
 Write-Host "=== Test Complete ===" -ForegroundColor Cyan
-Write-Host "API is functional and ready for frontend integration!" -ForegroundColor Green
+if ($errorCount -eq 0) {
+    Write-Host "[OK] API is functional and ready for frontend integration!" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] $errorCount test(s) failed" -ForegroundColor Red
+}
 Write-Host "API Base URL: $baseUrl" -ForegroundColor Gray

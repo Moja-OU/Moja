@@ -1,7 +1,4 @@
 import { AzureOpenAI } from 'openai';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
 
 // Azure OpenAI configuration
 const openai = new AzureOpenAI({
