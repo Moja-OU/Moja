@@ -26,8 +26,10 @@ pnpm install
 The `.env` file already exists with placeholder values. Update it with your keys:
 
 ```bash
-# Required: Add your OpenAI API key
-OPENAI_API_KEY="sk-proj-YOUR-KEY-HERE"
+# Required: Add your Azure OpenAI credentials
+AZURE_OPENAI_KEY="your-azure-openai-key"
+AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+AZURE_OPENAI_API_VERSION="2024-02-15-preview"
 
 # Optional: Generate VAPID keys for web push
 npx web-push generate-vapid-keys
@@ -206,7 +208,7 @@ npx prisma generate
 
 2. **Logging:** Check terminal output for AI responses and errors
 
-3. **OpenAI API Key:** Required for AI orchestrator to work. Get one at platform.openai.com
+3. **Azure OpenAI Credentials:** Required for AI orchestrator to work. Get credentials from your Azure OpenAI resource
 
 4. **Web Push:** Generate VAPID keys with `npx web-push generate-vapid-keys`
 
@@ -227,8 +229,8 @@ Check that `DATABASE_URL` in `.env` points to `file:./dev.db`
 
 ### AI orchestrator errors
 
-1. Verify `OPENAI_API_KEY` is set in `.env`
-2. Check OpenAI account has credits
+1. Verify `AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`, and `AZURE_OPENAI_API_VERSION` are set in `.env`
+2. Check Azure OpenAI account has credits
 3. Review terminal logs for API error details
 
 ### Port already in use
@@ -253,6 +255,6 @@ taskkill /PID <PID> /F
 - Person C: Dashboard UI
 
 **Todo:**
-- Add OpenAI API key to `.env`
+- Add Azure OpenAI credentials to `.env`
 - Test complete flow: register → AI execute → dashboard
 - Generate VAPID keys for push notifications (optional)
