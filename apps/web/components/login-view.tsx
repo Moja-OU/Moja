@@ -24,7 +24,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
               <Headphones className="h-6 w-6 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-xl text-foreground">AI Call Center Concierge</CardTitle>
+          <CardTitle className="text-xl text-foreground">UmojaLife</CardTitle>
           <CardDescription className="text-muted-foreground">
             Sign in to your account or try the demo
           </CardDescription>
