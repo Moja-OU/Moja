@@ -14,12 +14,20 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
+    "@types/node": "^20.11.19",
     "prettier": "^3.2.5",
-    "@types/node": "^20.11.19"
+    "turbo": "^2.0.0"
   },
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "dependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "openai": "^6.18.0",
+    "web-push": "^3.6.7"
   }
 }

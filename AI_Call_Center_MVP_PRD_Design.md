@@ -70,7 +70,9 @@ A voice-first AI “call center” that helps users:
 - AI Orchestrator (“tool calling” via JSON)
 
 **Database:** SQLite (fast, $0, ideal for demo)
-
+**AI Provider:** Azure OpenAI (via `openai` npm package's `AzureOpenAI` client)  
+- Uses **function/tool calling** for structured JSON action output  
+- Env vars: `AZURE_OPENAI_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_VERSION`, `OPENAI_MODEL`
 **Voice pipeline (optional but recommended):**
 - Browser mic → API `/voice/transcribe` → `whisper.cpp`
 - API → AI Orchestrator → text reply
