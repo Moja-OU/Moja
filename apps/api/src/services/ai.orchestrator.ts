@@ -140,6 +140,19 @@ export class AIOrchestrator {
       }
     ];
   }
+
+  static validateAction(action: AIAction): boolean {
+  if (!action.type || !action.payload) return false;
+
+  switch (action.type) {
+    case 'CREATE_BOOKING':
+      return !!(action.payload.businessName && action.payload.datetimeLocal);
+    case 'SET_BUDGET':
+      return !!(action.payload.category && action.payload.amount);
+    default:
+      return true; 
+  }
+}
   static async interpretMessage(
     userMessage: string,
     context: AIContext

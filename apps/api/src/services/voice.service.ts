@@ -192,7 +192,7 @@ case CallState.DISCOVERY:
 
                             case 'GENERATE_GOAL_PLAN':
                                 // Complex logic -> Delegate to a dedicated service
-                                await GoalService.generateActionPlan(session.userId, action.payload.goalId);
+                                await GoalService.generateGoalPlan(session.userId, action.payload.goalId);
                                 break;
 
                             case 'CREATE_REMINDER':
@@ -207,7 +207,7 @@ case CallState.DISCOVERY:
                                 });
                                 break;
 
-                            case 'EXPORT_CALENDAR_EVENT':
+                          /*  case 'EXPORT_CALENDAR_EVENT':
                                 await CalendarService.addToUserCalendar(session.userId, {
                                     title: action.payload.title,
                                     start: new Date(action.payload.startDatetime),
@@ -215,6 +215,7 @@ case CallState.DISCOVERY:
                                     location: action.payload.location
                                 });
                                 break;
+                                */
 
                             default:
                                 console.warn(`⚠️ Unhandled action type: ${action.type}`);

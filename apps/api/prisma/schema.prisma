@@ -73,13 +73,14 @@ model Activity {
   session         Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   goalId          String?
   goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  title           String
+  name           String
   datetimeLocal   DateTime
   durationMin     Int       @default(60)
   recurrenceRule  String?   // e.g., "WEEKLY;BYDAY=MO,WE,FR"
   status          String    @default("PLANNED") // PLANNED|DONE|SKIPPED
   calendarEventId String?
   createdAt       DateTime  @default(now())
+  
 
   @@index([userId, datetimeLocal])
   @@index([userId, status])
@@ -91,7 +92,7 @@ model Goal {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title       String
   metric      String   // e.g., "runs/week"
-  targetValue Int
+  targetAmount Float
   frequency   String   // WEEKLY|BIWEEKLY|MONTHLY
   streakCount Int      @default(0)
   createdAt   DateTime @default(now())
@@ -108,7 +109,7 @@ model Budget {
   category        String   // FOOD|FUN|GENERAL
   period          String   // WEEKLY|MONTHLY
   limitAmount     Float
-  remainingAmount Float
+  remainingAmount Float    @default(0)
   startDate       DateTime @default(now())
 
   expenses Expense[]
@@ -155,4 +156,12 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Reminder { // <--- Add this entire model (Fixes TS2305)
+  id       String   @id @default(cuid())
+  userId   String
+  title    String
+  remindAt DateTime
+  isSent   Boolean  @default(false)
 }

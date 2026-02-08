@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "generate:prisma": "prisma generate"
   },
   "dependencies": {
     "@moja/types": "workspace:*",
