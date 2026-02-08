@@ -44,13 +44,13 @@ export class CalendarService {
 
     const description = activity.goal
       ? `Part of goal: ${activity.goal.title}`
-      : activity.title;
+      : activity.name;
 
     return this.buildICS({
       uid: `activity-${activity.id}`,
       start: startTime,
       end: endTime,
-      summary: activity.title,
+      summary: activity.name,
       description,
       recurrence: activity.recurrenceRule || undefined,
     });

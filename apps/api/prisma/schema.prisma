@@ -73,32 +73,35 @@ model Activity {
   session         Session?  @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   goalId          String?
   goal            Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  title           String
+  name            String
   datetimeLocal   DateTime
   durationMin     Int       @default(60)
   recurrenceRule  String?   // e.g., "WEEKLY;BYDAY=MO,WE,FR"
   status          String    @default("PLANNED") // PLANNED|DONE|SKIPPED
   calendarEventId String?
   createdAt       DateTime  @default(now())
+  type            String
+  
 
   @@index([userId, datetimeLocal])
   @@index([userId, status])
 }
 
 model Goal {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  metric      String   // e.g., "runs/week"
-  targetValue Int
-  frequency   String   // WEEKLY|BIWEEKLY|MONTHLY
-  streakCount Int      @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  metric       String?
+  targetAmount Float
+  targetDate   DateTime?   // ADD
+  frequency    String?
+  status       String   @default("ACTIVE") // ADD
+  streakCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  category     String?
 
   activities Activity[]
-
-  @@index([userId])
 }
 
 model Budget {
@@ -108,7 +111,7 @@ model Budget {
   category        String   // FOOD|FUN|GENERAL
   period          String   // WEEKLY|MONTHLY
   limitAmount     Float
-  remainingAmount Float
+  remainingAmount Float    @default(0)
   startDate       DateTime @default(now())
 
   expenses Expense[]
@@ -155,4 +158,13 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model Reminder {
+  id       String   @id @default(cuid())
+  userId   String
+  title    String
+  remindAt DateTime
+  priority String   @default("NORMAL")
+  isSent   Boolean  @default(false)
 }

@@ -11,6 +11,8 @@ import { GoalService } from './services/goal.service';
 import { BudgetService } from './services/budget.service';
 import { CalendarService } from './services/calendar.service';
 import { NotificationService } from './services/notification.service';
+import { VoiceService } from './services/voice.service';
+import bodyParser from 'body-parser';
 
 dotenv.config();
 
@@ -19,6 +21,9 @@ const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+
+app.use(bodyParser.urlencoded({ extended: false }));
+//app.use(express.urlencoded({ extended: false }));
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -142,7 +147,7 @@ app.post('/sessions/start', authMiddleware, async (req, res) => {
 app.post('/sessions/:id/append', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { userMessage, assistantMessage } = req.body;
 
     if (!userMessage || !assistantMessage) {
@@ -165,7 +170,7 @@ app.post('/sessions/:id/append', authMiddleware, async (req, res) => {
 app.post('/sessions/:id/end', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { summary } = req.body;
 
     const session = await SessionService.endSession(id, userId, summary);
@@ -289,19 +294,20 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
 
     case 'CREATE_ACTIVITY':
       return await SchedulingService.createActivity(userId, {
-        title: action.payload.title,
+        name: action.payload.title,
         datetimeLocal: action.payload.datetimeLocal,
         durationMin: action.payload.durationMin,
         recurrenceRule: action.payload.recurrenceRule,
         goalId: action.payload.goalId,
         sessionId,
+        type: action.payload.type,
       });
 
     case 'CREATE_GOAL':
       return await GoalService.createGoal(userId, {
         title: action.payload.title,
         metric: action.payload.metric,
-        targetValue: action.payload.targetValue,
+        targetAmount: action.payload.targetAmount,
         frequency: action.payload.frequency,
       });
 
@@ -350,7 +356,7 @@ app.post('/bookings', authMiddleware, async (req, res) => {
 app.patch('/bookings/:id', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
 
     let booking;
@@ -401,7 +407,7 @@ app.post('/activities', authMiddleware, async (req, res) => {
 app.patch('/activities/:id', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
 
     let activity;
@@ -451,7 +457,7 @@ app.post('/goals', authMiddleware, async (req, res) => {
 
 app.post('/goals/:id/plan', authMiddleware, async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const result = await GoalService.generateGoalPlan(id, req.body.preferences);
     res.json(result);
   } catch (error) {
@@ -531,7 +537,7 @@ app.get('/budgets/current', authMiddleware, async (req, res) => {
 app.get('/calendar/booking/:id.ics', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const icsContent = await CalendarService.generateBookingICS(id, userId);
 
@@ -548,7 +554,7 @@ app.get('/calendar/booking/:id.ics', authMiddleware, async (req, res) => {
 app.get('/calendar/activity/:id.ics', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const icsContent = await CalendarService.generateActivityICS(id, userId);
 
@@ -615,6 +621,36 @@ app.post('/notify/check', authMiddleware, async (_req, res) => {
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to check notifications',
     });
+  }
+});
+
+app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
+  try {
+    const { CallSid, From } = req.body;
+    console.log(`📞 Incoming call from ${From}`);
+
+    // Generate TwiML instructions for Twilio
+    const twiml = await VoiceService.handleIncomingCall(CallSid, From);
+
+    // Send XML response back to Twilio
+    res.type('text/xml');
+    res.send(twiml);
+  } catch (error) {
+    console.error("Voice Error:", error);
+    res.status(500).send('<Response><Say>System error.</Say></Response>');
+  }
+});
+
+app.post('/voice/process', async (req, res) => {
+  try {
+    const { CallSid, SpeechResult, Digits } = req.body;
+    const xmlResponse = await VoiceService.processInput(CallSid, SpeechResult, Digits);
+
+    res.type('text/xml');
+    res.send(xmlResponse);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error processing speech');
   }
 });
 

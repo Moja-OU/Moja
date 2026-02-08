@@ -10,7 +10,7 @@ export class GoalService {
     data: {
       title: string;
       metric: string;
-      targetValue: number;
+      targetAmount: number;
       frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
     }
   ) {
@@ -19,7 +19,7 @@ export class GoalService {
         userId,
         title: data.title,
         metric: data.metric,
-        targetValue: data.targetValue,
+        targetAmount: data.targetAmount,
         frequency: data.frequency,
         streakCount: 0,
       },
@@ -57,15 +57,15 @@ export class GoalService {
     let scheduleDays: number[]; // 0 = Sunday, 1 = Monday, etc.
 
     if (goal.frequency === 'WEEKLY') {
-      if (goal.targetValue === 3) {
+      if (goal.targetAmount === 3) {
         scheduleDays = [1, 3, 5]; // Mon, Wed, Fri
-      } else if (goal.targetValue === 2) {
+      } else if (goal.targetAmount === 2) {
         scheduleDays = [1, 4]; // Mon, Thu
-      } else if (goal.targetValue === 7) {
+      } else if (goal.targetAmount === 7) {
         scheduleDays = [0, 1, 2, 3, 4, 5, 6]; // Every day
       } else {
         // Default: spread evenly
-        scheduleDays = this.spreadDaysEvenly(goal.targetValue);
+        scheduleDays = this.spreadDaysEvenly(goal.targetAmount);
       }
     } else {
       // For now, just use 3x/week for other frequencies
@@ -90,11 +90,12 @@ export class GoalService {
         activityDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
         const activity = await SchedulingService.createActivity(goal.userId, {
-          title: goal.title,
+          name: goal.title,
           datetimeLocal: activityDate,
           durationMin: 60,
           recurrenceRule: this.buildRecurrenceRule(scheduleDays),
           goalId: goal.id,
+          type: 'GOAL',
         });
 
         activities.push(activity);
@@ -169,8 +170,8 @@ export class GoalService {
     return {
       goal,
       completed: goal.streakCount,
-      target: goal.targetValue,
-      percentage: (goal.streakCount / goal.targetValue) * 100,
+      target: goal.targetAmount,
+      percentage: goal.targetAmount > 0 ? (goal.streakCount / goal.targetAmount) * 100 : 0,
     };
   }
 
@@ -196,14 +197,14 @@ export class GoalService {
    */
   private static spreadDaysEvenly(count: number): number[] {
     if (count >= 7) return [0, 1, 2, 3, 4, 5, 6];
-    
+
     const days: number[] = [];
     const interval = Math.floor(7 / count);
-    
+
     for (let i = 0; i < count; i++) {
       days.push((i * interval + 1) % 7); // Start from Monday
     }
-    
+
     return days;
   }
 

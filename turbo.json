@@ -23,7 +23,10 @@
     },
     "clean": {
       "cache": false
-    }
+    },
+    "generate": {
+      "cache": false
+    },
   },
   "globalEnv": [
     "DATABASE_URL",

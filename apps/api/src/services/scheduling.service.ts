@@ -7,24 +7,26 @@ export class SchedulingService {
   static async createActivity(
     userId: string,
     data: {
-      title: string;
+      name: string;
       datetimeLocal: Date | string;
       durationMin?: number;
       recurrenceRule?: string;
       goalId?: string;
       sessionId?: string;
+      type?: string;
     }
   ) {
     const activity = await prisma.activity.create({
       data: {
         userId,
-        title: data.title,
+        name: data.name,
         datetimeLocal: new Date(data.datetimeLocal),
         durationMin: data.durationMin || 60,
         recurrenceRule: data.recurrenceRule,
         goalId: data.goalId,
         sessionId: data.sessionId,
         status: 'PLANNED',
+        type: data.type || 'GENERAL',
       },
     });
 

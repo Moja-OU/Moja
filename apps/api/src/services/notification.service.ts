@@ -163,7 +163,7 @@ export class NotificationService {
 
       await this.sendPushNotification(activity.userId, {
         title: 'Upcoming Activity',
-        body: `${activity.title} starting in ${minutesUntil} minutes`,
+        body: `${activity.name} starting in ${minutesUntil} minutes`,
         data: { activityId: activity.id },
       });
 
@@ -171,7 +171,7 @@ export class NotificationService {
       await this.scheduleNotification(
         activity.userId,
         'UPCOMING_ACTIVITY',
-        { activityId: activity.id, title: activity.title },
+        { activityId: activity.id, title: activity.name },
         now
       );
 
