@@ -701,13 +701,15 @@ app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
 app.post('/voice/process', async (req, res) => {
   try {
     const { CallSid, SpeechResult, Digits } = req.body;
+    console.log(`🎤 Voice input — CallSid: ${CallSid}, Speech: "${SpeechResult || ''}", Digits: "${Digits || ''}"`)
     const xmlResponse = await VoiceService.processInput(CallSid, SpeechResult, Digits);
 
     res.type('text/xml');
     res.send(xmlResponse);
   } catch (error) {
-    console.error(error);
-    res.status(500).send('Error processing speech');
+    console.error('❌ Voice process error:', error);
+    res.type('text/xml');
+    res.send('<Response><Say>I had trouble processing that. Could you say it again?</Say><Gather input="speech" action="/voice/process" timeout="5"/></Response>');
   }
 });
 
