@@ -13,6 +13,7 @@ export default function Page() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentView, setCurrentView] = useState<ViewType>("dashboard")
   const [isChecking, setIsChecking] = useState(true)
+  const [user, setUser] = useState<{ name: string; email: string } | undefined>(undefined)
 
   // Check for existing token on mount
   useEffect(() => {
@@ -21,7 +22,8 @@ export default function Page() {
       if (token) {
         try {
           // Validate token by attempting to fetch dashboard
-          await APIClient.getDashboard()
+          const dashboardData = await APIClient.getDashboard()
+          setUser(dashboardData.user)
           setIsLoggedIn(true)
         } catch (error) {
           // Token invalid or expired
@@ -35,6 +37,7 @@ export default function Page() {
 
   const handleLogout = () => {
     APIClient.clearToken()
+    setUser(undefined)
     setIsLoggedIn(false)
     setCurrentView("dashboard")
     toast.success("Logged out successfully")
@@ -52,7 +55,10 @@ export default function Page() {
     return (
       <>
         <Toaster position="top-right" richColors />
-        <LoginView onLogin={() => setIsLoggedIn(true)} />
+        <LoginView onLogin={(user) => {
+          setUser(user)
+          setIsLoggedIn(true)
+        }} />
       </>
     )
   }
@@ -60,10 +66,11 @@ export default function Page() {
   return (
     <>
       <Toaster position="top-right" richColors />
-      <AppShell 
-        currentView={currentView} 
+      <AppShell
+        currentView={currentView}
         onViewChange={setCurrentView}
         onLogout={handleLogout}
+        user={user}
       >
         {currentView === "dashboard" && <DashboardView />}
         {currentView === "call" && <CallView />}

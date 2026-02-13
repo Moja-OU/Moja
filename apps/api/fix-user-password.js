@@ -5,16 +5,16 @@ const prisma = new PrismaClient();
 async function main() {
   // Hash the password 'password123'
   const passwordHash = await bcrypt.hash('password123', 10);
-  
+
   const user = await prisma.user.update({
     where: { email: 'test@moja.com' },
-    data: { 
-      name: 'Luc',
+    data: {
+      name: 'test',
       passwordHash: passwordHash,
       phone: '+14052238806'
-    },  
+    },
   });
-  
+
   console.log('✅ Updated user credentials:');
   console.log('   Name:', user.name);
   console.log('   Email:', user.email);

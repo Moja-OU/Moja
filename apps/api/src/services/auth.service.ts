@@ -97,17 +97,7 @@ export class AuthService {
   /**
    * Create demo user (fast login for hackathon)
    */
-  static async createDemoUser() {
-    const demoEmail = `demo-${Date.now()}@moja.com`;
-    const demoPassword = 'demo123';
 
-    return this.register({
-      email: demoEmail,
-      password: demoPassword,
-      name: 'Demo User',
-      timezone: 'America/Chicago',
-    });
-  }
 
   /**
    * Generate JWT token

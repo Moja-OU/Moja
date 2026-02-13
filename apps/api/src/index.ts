@@ -80,16 +80,7 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-app.post('/auth/demo', async (_req, res) => {
-  try {
-    const result = await AuthService.createDemoUser();
-    res.status(201).json(result);
-  } catch (error) {
-    res.status(500).json({
-      error: error instanceof Error ? error.message : 'Demo user creation failed',
-    });
-  }
-});
+
 
 // ============================================================================
 // DASHBOARD ROUTE
@@ -100,8 +91,9 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
     const userId = req.user!.userId;
 
     // Fetch all dashboard data in parallel
-    const [sessions, upcomingBookings, upcomingActivities, goals, budgets, recentExpenses] =
+    const [user, sessions, upcomingBookings, upcomingActivities, goals, budgets, recentExpenses] =
       await Promise.all([
+        AuthService.getUserById(userId),
         SessionService.getUserSessions(userId, 10),
         BookingService.getUpcoming(userId),
         SchedulingService.getUpcoming(userId),
@@ -111,6 +103,7 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
       ]);
 
     res.json({
+      user: { name: user.name, email: user.email },
       sessions,
       upcomingBookings,
       upcomingActivities,
@@ -368,7 +361,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
       let budgetId = action.payload.budgetId;
       if (!budgetId && action.payload.category) {
         const budgets = await BudgetService.getCurrentBudgets(userId);
-        const match = budgets.find((b: any) => 
+        const match = budgets.find((b: any) =>
           b.category.toLowerCase() === action.payload.category.toLowerCase()
         );
         if (match) budgetId = match.id;

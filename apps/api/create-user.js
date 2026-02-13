@@ -8,19 +8,19 @@ async function main() {
   const user = await prisma.user.upsert({
     where: { email: 'test@moja.com' },
     update: {
-      name: 'Luc',
+      name: 'test',
       passwordHash,
       phone: '+14052238806',
       voicePin: '1234',
-      timezone: 'America/Chicago',
+      timezone: 'America/Oklahoma_City',
     },
     create: {
       email: 'test@moja.com',
-      name: 'Luc',
+      name: 'test',
       passwordHash,
       phone: '+14052238806',
       voicePin: '1234',
-      timezone: 'America/Chicago',
+      timezone: 'America/Oklahoma_City',
     },
   });
 

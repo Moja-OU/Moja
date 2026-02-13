@@ -26,6 +26,7 @@ interface AppShellProps {
   onViewChange: (view: ViewType) => void
   onLogout?: () => void
   children: ReactNode
+  user?: { name: string; email: string }
 }
 
 function SidebarContent({
@@ -92,13 +93,12 @@ function SidebarContent({
             Logout
           </Button>
         )}
-        <p className="text-[11px] text-muted-foreground">Fast demo mode (no real PSTN)</p>
       </div>
     </div>
   )
 }
 
-export function AppShell({ currentView, onViewChange, onLogout, children }: AppShellProps) {
+export function AppShell({ currentView, onViewChange, onLogout, children, user }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -141,7 +141,7 @@ export function AppShell({ currentView, onViewChange, onLogout, children }: AppS
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
-              <span>Demo User</span>
+              <span>{user?.name || 'User'}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
