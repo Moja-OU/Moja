@@ -90,7 +90,7 @@ export class SessionService {
    * Get user sessions
    */
   static async getUserSessions(userId: string, limit = 20) {
-    return await prisma.session.findMany({
+    const sessions = await prisma.session.findMany({
       where: { userId },
       orderBy: { startedAt: 'desc' },
       take: limit,
@@ -99,6 +99,11 @@ export class SessionService {
         activities: true,
       },
     });
+
+    return sessions.map(session => ({
+      ...session,
+      transcript: session.transcript ? JSON.parse(session.transcript) : [],
+    }));
   }
 
   /**
@@ -117,7 +122,10 @@ export class SessionService {
       throw new Error('Session not found');
     }
 
-    return session;
+    return {
+      ...session,
+      transcript: session.transcript ? JSON.parse(session.transcript) : [],
+    };
   }
 
   /**
