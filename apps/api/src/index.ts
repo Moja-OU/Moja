@@ -676,6 +676,10 @@ app.post('/notify/check', authMiddleware, async (_req, res) => {
 
 app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
   try {
+    // Debug logging to file
+    const logData = `[${new Date().toISOString()}] Incoming Call\nHeaders: ${JSON.stringify(req.headers)}\nBody: ${JSON.stringify(req.body)}\n\n`;
+    require('fs').appendFileSync('debug_voice.log', logData);
+
     const { CallSid, From } = req.body;
     console.log(`📞 Incoming call from ${From}`);
 
@@ -687,7 +691,9 @@ app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
     res.send(twiml);
   } catch (error) {
     console.error("Voice Error:", error);
-    res.status(500).send('<Response><Say>System error.</Say></Response>');
+    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Error: ${error}\n\n`);
+    // Return 200 OK even on error so Twilio plays the message
+    res.status(200).send('<Response><Say>System error occurred. Check logs.</Say></Response>');
   }
 });
 

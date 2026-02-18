@@ -1,3 +1,5 @@
+/* this file is the brain of the application */
+
 import { AzureOpenAI } from 'openai';
 import { tavily } from "@tavily/core";
 
@@ -58,7 +60,7 @@ export interface AIContext {
 
 // --- The Orchestrator ---
 export class AIOrchestrator {
-  
+
   /**
    * Main entry point: Interpret user message, searching if necessary, 
    * and returning structured actions.
@@ -78,9 +80,9 @@ export class AIOrchestrator {
           parameters: {
             type: 'object',
             properties: {
-              query: { 
-                type: 'string', 
-                description: 'The search query (e.g., "Weather in Miami", "The Library restaurant address St. Louis", "Movies playing near me")' 
+              query: {
+                type: 'string',
+                description: 'The search query (e.g., "Weather in Miami", "The Library restaurant address St. Louis", "Movies playing near me")'
               }
             },
             required: ['query']
@@ -97,12 +99,12 @@ export class AIOrchestrator {
           parameters: {
             type: 'object',
             properties: {
-              assistant_message: { 
-                type: 'string', 
-                description: 'A natural, human-like confirmation message to the user. (e.g. "I\'ve created a booking request for The Library at 7 PM.")' 
+              assistant_message: {
+                type: 'string',
+                description: 'A natural, human-like confirmation message to the user. (e.g. "I\'ve created a booking request for The Library at 7 PM.")'
               },
-              missing_fields: { 
-                type: 'array', 
+              missing_fields: {
+                type: 'array',
                 items: { type: 'string' },
                 description: 'List of fields that are still needed to complete the action (e.g., ["partySize", "time"]). Leave empty if all info is present.'
               },
@@ -115,19 +117,19 @@ export class AIOrchestrator {
                     type: {
                       type: 'string',
                       enum: [
-                        'CREATE_BOOKING', 
-                        'CONFIRM_BOOKING', 
+                        'CREATE_BOOKING',
+                        'CONFIRM_BOOKING',
                         'CREATE_ACTIVITY',
-                        'CREATE_GOAL', 
-                        'GENERATE_GOAL_PLAN', 
+                        'CREATE_GOAL',
+                        'GENERATE_GOAL_PLAN',
                         'SET_BUDGET',
-                        'ADD_EXPENSE', 
-                        'CREATE_REMINDER', 
+                        'ADD_EXPENSE',
+                        'CREATE_REMINDER',
                         'EXPORT_CALENDAR_EVENT'
                       ],
                       description: 'The specific type of action to execute.'
                     },
-                    payload: { 
+                    payload: {
                       type: 'object',
                       description: `The data required for the action. 
                         - CREATE_BOOKING: { businessName, datetimeLocal (ISO string), partySize, notes }
@@ -152,24 +154,24 @@ export class AIOrchestrator {
   }
 
   static validateAction(action: AIAction): boolean {
-  if (!action.type || !action.payload) return false;
+    if (!action.type || !action.payload) return false;
 
-  switch (action.type) {
-    case 'CREATE_BOOKING':
-      return !!(action.payload.businessName && action.payload.datetimeLocal);
-    case 'SET_BUDGET':
-      return !!(action.payload.category && action.payload.amount);
-    default:
-      return true; 
+    switch (action.type) {
+      case 'CREATE_BOOKING':
+        return !!(action.payload.businessName && action.payload.datetimeLocal);
+      case 'SET_BUDGET':
+        return !!(action.payload.category && action.payload.amount);
+      default:
+        return true;
+    }
   }
-}
   static async interpretMessage(
     userMessage: string,
     context: AIContext
   ): Promise<AIResponse> {
     try {
       const systemPrompt = this.buildSystemPrompt(context);
-      
+
       let messages: any[] = [{ role: 'system', content: systemPrompt }];
       if (context.recentMessages) messages.push(...context.recentMessages.slice(-5));
       messages.push({ role: 'user', content: userMessage });
@@ -179,7 +181,7 @@ export class AIOrchestrator {
         model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
         messages,
         tools: this.getTools() as any, // Cast to 'any' to avoid strict union mismatch issues
-        tool_choice: 'auto', 
+        tool_choice: 'auto',
       });
 
       let responseMessage = response.choices[0].message;
@@ -193,13 +195,13 @@ export class AIOrchestrator {
         // TS FIX: STRICT TYPE GUARD
         // We must check firstTool.type === 'function' before accessing .function
         if (firstTool.type === 'function' && firstTool.function.name === 'perform_search') {
-          
+
           const searchArgs = JSON.parse(firstTool.function.arguments);
           console.log(`🕵️ Searching for: ${searchArgs.query}`);
-          
+
           // 1. Execute Search
           const searchData = await getTavily().search(searchArgs.query, { maxResults: 5 });
-          
+
           // 2. Feed results back to history
           messages.push(responseMessage);
           messages.push({
@@ -213,9 +215,9 @@ export class AIOrchestrator {
             model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
             messages,
             tools: this.getTools() as any,
-            tool_choice: 'auto' 
+            tool_choice: 'auto'
           });
-          
+
           // Update the response message for the next step
           responseMessage = response.choices[0].message;
           toolCalls = responseMessage.tool_calls;
@@ -249,16 +251,29 @@ export class AIOrchestrator {
         actions: []
       };
 
-    } catch (error) {
-      console.error('AI Orchestrator error:', error);
+    } catch (error: any) {
+      console.error('❌ AI Orchestrator error:', error?.message || error);
+      console.error('   Stack:', error?.stack);
+      console.error('   Status:', error?.status);
+      console.error('   Code:', error?.code);
+      // Write to debug file
+      const fs = require('fs');
+      fs.appendFileSync('debug_ai.log', `[${new Date().toISOString()}] AI Error:\n  Message: ${error?.message}\n  Status: ${error?.status}\n  Code: ${error?.code}\n  Stack: ${error?.stack}\n  Full: ${JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2)}\n\n`);
       return { assistantMessage: "I encountered a system error.", missingFields: [], actions: [] };
     }
   }
   private static buildSystemPrompt(context: AIContext): string {
-  const timezone = context.userProfile?.timezone || 'America/Chicago';
-  const currentDate = new Date().toLocaleString('en-US', { timeZone: timezone });
+    const timezone = context.userProfile?.timezone || 'America/Chicago';
+    let currentDate: string;
+    try {
+      currentDate = new Date().toLocaleString('en-US', { timeZone: timezone });
+    } catch {
+      // Fallback if timezone is invalid (e.g., "America/Oklahoma_City")
+      console.warn(`⚠️ Invalid timezone "${timezone}", falling back to America/Chicago`);
+      currentDate = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+    }
 
-  return `
+    return `
 You are Moja, a smart, friendly AI concierge and personal assistant.
 
 Current date/time (${timezone}): ${currentDate}
@@ -358,6 +373,6 @@ EXPORT_CALENDAR_EVENT
 
 Be helpful, natural, and precise.
 `;
-}
+  }
 
 }
