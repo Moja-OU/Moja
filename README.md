@@ -127,7 +127,7 @@ The AI layer uses **Gemini's function calling** to route user intent into struct
 ## 🧗 Challenges
 
 - **Real-time audio bridging** — Getting Twilio's Mu-law 8kHz audio to cleanly transcode and stream into Gemini's PCM 24kHz format in real time required building custom audio conversion utilities from scratch.
-- **API migrations under time pressure** — We pivoted from Azure OpenAI to Google Gemini mid-hackathon when access was lost, requiring a full rewrite of the voice service in a few hours.
+- **Strategic API pivot under time pressure** — Mid-hackathon, we made the call to migrate from Azure OpenAI to Google Gemini to compete for the **Best Use of Gemini** prize. This meant a full rewrite of the voice service in a few hours — a calculated risk that pushed us technically and paid off in learning.
 - **Latency tuning** — Achieving a natural conversation feel over a phone call (without awkward silence) involved careful WebSocket event sequencing and audio chunk pipelining.
 - **Session management** — Preserving conversation context across call reconnects and syncing voice sessions to the web dashboard required thoughtful database schema design.
 - **Auth over voice** — Implementing PIN-based identity verification purely through phone DTMF or speech (with no app or web UI) was a novel UX challenge.
