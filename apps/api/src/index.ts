@@ -35,9 +35,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Moja API is running' });
 });
 
-// ============================================================================
 // AUTH ROUTES
-// ============================================================================
 
 app.post('/auth/register', async (req, res) => {
   try {
@@ -82,9 +80,7 @@ app.post('/auth/login', async (req, res) => {
 
 
 
-// ============================================================================
 // DASHBOARD ROUTE
-// ============================================================================
 
 app.get('/dashboard', authMiddleware, async (req, res) => {
   try {
@@ -120,9 +116,7 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // SESSION ROUTES
-// ============================================================================
 
 app.post('/sessions/start', authMiddleware, async (req, res) => {
   try {
@@ -192,9 +186,7 @@ app.get('/sessions', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // AI EXECUTE ROUTE (CORE ENDPOINT)
-// ============================================================================
 
 app.post('/ai/execute', authMiddleware, async (req, res) => {
   try {
@@ -387,9 +379,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
   }
 }
 
-// ============================================================================
 // BOOKING ROUTES
-// ============================================================================
 
 app.post('/bookings', authMiddleware, async (req, res) => {
   try {
@@ -438,9 +428,7 @@ app.get('/bookings/upcoming', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // ACTIVITY ROUTES
-// ============================================================================
 
 app.post('/activities', authMiddleware, async (req, res) => {
   try {
@@ -489,9 +477,7 @@ app.get('/activities/upcoming', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // GOAL ROUTES
-// ============================================================================
 
 app.post('/goals', authMiddleware, async (req, res) => {
   try {
@@ -529,9 +515,7 @@ app.get('/goals', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // BUDGET & EXPENSE ROUTES
-// ============================================================================
 
 app.post('/budgets', authMiddleware, async (req, res) => {
   try {
@@ -580,9 +564,7 @@ app.get('/budgets/current', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // CALENDAR ROUTES
-// ============================================================================
 
 app.get('/calendar/booking/:id.ics', authMiddleware, async (req, res) => {
   try {
@@ -729,13 +711,33 @@ app.post('/voice/status', async (req, res) => {
   }
 });
 
-// ============================================================================
-// START SERVER
-// ============================================================================
+// START SERVER WITH WEBSOCKET SUPPORT
+
+import { WebSocketServer } from 'ws';
+import { VoiceRealtimeService } from './services/voice-realtime.service';
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Moja API running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+});
+
+// Initialize WebSocket Server
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws, req) => {
+  const fs = require('fs');
+  fs.appendFileSync('debug_ws.log', `[${new Date().toISOString()}] Connection request: ${req.url}\n`);
+  console.log('🔌 New WebSocket connection:', req.url);
+
+  // Check path (allow query params)
+  if (req.url?.startsWith('/voice/stream')) {
+    const voiceService = new VoiceRealtimeService(ws);
+    voiceService.handleConnection();
+  } else {
+    console.log('❌ Unknown WebSocket path:', req.url);
+    fs.appendFileSync('debug_ws.log', `[${new Date().toISOString()}] REJECTED: ${req.url}\n`);
+    ws.close();
+  }
 });
 
 server.on('error', (err) => {

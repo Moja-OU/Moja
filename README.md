@@ -15,7 +15,7 @@ Our vision is for Moja to be completely free, a public utility hotline, like dia
 
 One phone call replaces the assistant that Big Tech gatekeeps behind expensive hardware.
 
-"Imagine if anyone on Earth could pick up any phone, dial a number, and have a personal AI assistant in their language, for free. That's Moja."
+> "Imagine if anyone on Earth could pick up any phone, dial a number, and have a personal AI assistant in their language, for free. That's Moja."
 
 ## Structure
 
@@ -32,7 +32,7 @@ packages/
 ## Tech Stack
 
 ### Frontend
-- **Next.js 16** (React) — Web dashboard
+- **Next.js** (React) — Web dashboard
 - **Tailwind CSS + shadcn/ui** — Modern UI components
 - **TypeScript** — Type-safe across the entire codebase
 
@@ -42,18 +42,19 @@ packages/
 - **JWT** — Token-based authentication for web; PIN-based auth for voice
 
 ### AI / Intelligence
-- **Azure OpenAI (GPT-4.1)** — Natural language interpretation and action orchestration
+- **Google Gemini 2.5** — Natural language understanding, action orchestration, and realtime voice
+- **Gemini Live API (WebSocket)** — Low-latency, bidirectional voice streaming with interruption support
 - **Tavily Search API** — Real-time web search (weather, restaurants, business hours, etc.)
 - **Tool Calling (Function Calling)** — Structured actions (CREATE_BOOKING, SET_BUDGET, etc.)
 
 ### Voice / Telephony
-- **Twilio Voice API** — Incoming calls, speech-to-text transcription, text-to-speech
+- **Twilio Voice API + Media Streams** — Incoming calls & bidirectional audio streaming
+- **WebSocket bridge** — Routes Twilio audio stream ↔ Gemini Live API in real time
 - **ngrok** — Tunnel local server to public URL for Twilio webhooks
 
 ### Infrastructure
 - **Turborepo + pnpm** — Monorepo managing frontend, backend, and shared packages
 - **bcrypt** — Secure password hashing
-
 
 ## Getting Started
 
@@ -76,8 +77,81 @@ pnpm dev
 
 Create `apps/api/.env`:
 
-```
+```env
+# Database
 DATABASE_URL="file:./dev.db"
-JWT_SECRET="dev-secret"
+
+# Auth
+JWT_SECRET="your-jwt-secret"
+JWT_EXPIRES_IN="7d"
+
+# Google Gemini (https://aistudio.google.com/)
+GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_MODEL="gemini-2.5-flash-native-audio-latest"
+
+# Twilio (https://console.twilio.com/)
+TWILIO_ACCOUNT_SID="your-account-sid"
+TWILIO_AUTH_TOKEN="your-auth-token"
+TWILIO_PHONE_NUMBER="+1xxxxxxxxxx"
+TWILIO_WEBHOOK_URL="https://your-ngrok-url.ngrok-free.dev"
+
+# Tavily Search (https://tavily.com/)
+TAVILY_API_KEY="your-tavily-key"
+
+# Server
 PORT=4000
+NODE_ENV="development"
 ```
+
+## Voice Setup (for local dev)
+
+1. Run `npx ngrok http 4000` to get a public URL
+2. Set `TWILIO_WEBHOOK_URL` in `.env` to the ngrok URL
+3. In the [Twilio console](https://console.twilio.com), set your phone number's webhook to `https://your-ngrok-url/voice/incoming`
+4. Call your Twilio number — Moja will answer!
+
+---
+
+## 🏗️ How We Built This
+
+Moja was built in 24 hours at **Hacklahoma 2026** by a small team of 3 driven by one big idea: *what if AI wasn't just for people who could afford a smartphone?*
+
+We started with a clear stack decision — a **Turborepo monorepo** to keep the frontend, backend, and shared packages in sync. The API is built on **Express.js + Prisma**, with **Next.js** powering the web dashboard.
+
+For voice, we initially integrated **Twilio Voice API** for call handling and whisper transcription. As we iterated, we migrated to **Twilio Media Streams** + **Google Gemini 2.5 Live API** over WebSockets — enabling truly real-time, bidirectional voice conversation with sub-second latency and natural interruption handling.
+
+The AI layer uses **Gemini's function calling** to route user intent into structured actions: booking appointments, setting budgets, searching the web via **Tavily**, and managing personal goals — all through natural speech.
+
+---
+
+## 🧗 Challenges
+
+- **Real-time audio bridging** — Getting Twilio's Mu-law 8kHz audio to cleanly transcode and stream into Gemini's PCM 24kHz format in real time required building custom audio conversion utilities from scratch.
+- **API migrations under time pressure** — We pivoted from Azure OpenAI to Google Gemini mid-hackathon when access was lost, requiring a full rewrite of the voice service in a few hours.
+- **Latency tuning** — Achieving a natural conversation feel over a phone call (without awkward silence) involved careful WebSocket event sequencing and audio chunk pipelining.
+- **Session management** — Preserving conversation context across call reconnects and syncing voice sessions to the web dashboard required thoughtful database schema design.
+- **Auth over voice** — Implementing PIN-based identity verification purely through phone DTMF or speech (with no app or web UI) was a novel UX challenge.
+
+---
+
+## ✅ What We Achieved
+
+- ✅ Working AI phone assistant — call a real number, talk naturally, get real answers
+- ✅ Real-time voice streaming with **Gemini 2.5 Live API** (WebSocket bidirectional audio)
+- ✅ AI-powered actions: bookings, budgets, goals, and web search — all via voice
+- ✅ Full web dashboard synced to call history and user data
+- ✅ Secure PIN-based authentication — no app required
+- ✅ Clean monorepo architecture ready to scale
+
+---
+
+## 🚀 Future Improvements
+
+- 🌍 **Multilingual support** — Detect and respond in the caller's native language using Gemini's multilingual capabilities (Spanish, French, Swahili, Hindi, and more)
+- 📱 **Free SMS follow-ups** — Send a text summary of every call (bookings confirmed, goals set, search results) so users have a record even without internet
+- 📞 **Free outbound calls** — Proactively call users for appointment reminders, budget alerts, and goal check-ins
+- 🧠 **Long-term memory** — Persist user preferences, recurring tasks, and life context across all sessions
+- 🔒 **Voice biometric auth** — Replace PIN with voice fingerprint recognition for seamless, secure identity
+- 🌐 **Offline-first sync** — Queue actions taken offline and sync when connectivity is restored
+- 🏥 **Domain-specific modes** — Healthcare, financial advising, legal aid — specialized Moja "agents" for high-impact verticals
+- 📊 **Usage analytics dashboard** — Help NGOs and governments understand community needs through anonymized usage patterns

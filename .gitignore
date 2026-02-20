@@ -56,4 +56,8 @@ pnpm-debug.log*
 tmp/
 temp/
 
+# Debug & temp scripts (generated during development)
+debug_*.log
+models.json
+
 
