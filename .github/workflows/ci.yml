@@ -14,6 +14,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,4 +49,6 @@ jobs:
         run: pnpm --filter @moja/api exec prisma generate
 
       - name: Build
-        run: pnpm turbo run build
+        run: pnpm turbo run build --concurrency=2
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"

@@ -43,276 +43,281 @@ const activeCalls: Record<string, VoiceSession> = {};
 
 export class VoiceService {
 
-// 1. Handle Incoming Call
-static async handleIncomingCall(callSid: string, fromNumber: string): Promise<string> {
-  const twiml = new VoiceResponse();
+  // 1. Handle Incoming Call
+  static async handleIncomingCall(callSid: string, fromNumber: string): Promise<string> {
+    const twiml = new VoiceResponse();
 
-  // Look up the user by phone number
-  const user = await prisma.user.findUnique({
-    where: { phone: fromNumber } // Use the unique phone column
-  });
+    // Look up the user by phone number
+    const user = await prisma.user.findUnique({
+      where: { phone: fromNumber }
+    });
 
-  if (!user) {
-    console.log("❌ User not found for number:", fromNumber);
-    twiml.say("Phone number not recognized. Goodbye.");
-    twiml.hangup();
-    return twiml.toString();
+    if (!user) {
+      console.log("❌ User not found for number:", fromNumber);
+      twiml.say("Phone number not recognized. Goodbye.");
+      twiml.hangup();
+      return twiml.toString();
+    }
+
+    // Create persisted session? 
+    // NOTE: The VoiceRealtimeService will also try to create a session when the stream connects.
+    // To avoid duplicates, we can let the WebSocket service handle session creation, 
+    // OR create it here and pass the ID in custom params.
+    // Let's pass user ID in custom params so WebSocket knows who it is.
+
+    const webhookUrl = process.env.TWILIO_WEBHOOK_URL;
+    const wssUrl = `wss://${webhookUrl?.replace('https://', '').replace('http://', '')}/voice/stream`;
+
+    console.log(`🔗 Generated WebSocket URL: ${wssUrl}`);
+    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Generating TwiML with URL: ${wssUrl}\n`);
+
+    const connect = twiml.connect();
+    const stream = connect.stream({
+      url: wssUrl
+    });
+
+    // Pass userId to the stream so we know who is calling
+    stream.parameter({
+      name: 'userId',
+      value: user.id
+    });
+
+    const response = twiml.toString();
+    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Generated TwiML: ${response}\n`);
+
+    return response;
   }
-
-  // Create a persisted VOICE session in the database
-  const dbSession = await SessionService.startSession(user.id, 'VOICE', callSid);
-
-  // Initialize in-memory state
-  activeCalls[callSid] = {
-    userId: user.id,
-    dbSessionId: dbSession.id,
-    state: CallState.AUTHENTICATION,
-    history: []
-  };
-
-  const gather = twiml.gather({
-    input: ['dtmf', 'speech'],
-    numDigits: 4,
-    action: '/voice/process',
-    timeout: 3
-  });
-
-  gather.say(`Hello ${user.name}. Please enter or say your four-digit security PIN.`);
-
-  return twiml.toString();
-}
 
 
   // 2. Process User Input
-  // 2. Process User Input
-static async processInput(callSid: string, speechResult: string, digits: string): Promise<string> {
-  const session = activeCalls[callSid];
-  const twiml = new VoiceResponse();
-  const input = digits || speechResult || '';
+  static async processInput(callSid: string, speechResult: string, digits: string): Promise<string> {
+    const session = activeCalls[callSid];
+    const twiml = new VoiceResponse();
+    const input = digits || speechResult || '';
 
-  if (!session) {
-    twiml.say("Session expired.");
-    twiml.hangup();
-    return twiml.toString();
-  }
+    if (!session) {
+      twiml.say("Session expired.");
+      twiml.hangup();
+      return twiml.toString();
+    }
 
-  // Load the user from DB for verification
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+    // Load the user from DB for verification
+    const user = await prisma.user.findUnique({ where: { id: session.userId } });
 
-  if (!user) {
-    twiml.say("User not found. Goodbye.");
-    twiml.hangup();
-    return twiml.toString();
-  }
+    if (!user) {
+      twiml.say("User not found. Goodbye.");
+      twiml.hangup();
+      return twiml.toString();
+    }
 
-  switch (session.state) {
-    case CallState.AUTHENTICATION:
-      // ✅ Use voicePin field for voice authentication
-      console.log('🔐 PIN Authentication attempt:');
-      console.log('   Expected (voicePin):', user.voicePin, 'Type:', typeof user.voicePin);
-      console.log('   Received (input):', input, 'Type:', typeof input);
-      console.log('   Match:', user.voicePin === input);
-      
-      if (user.voicePin && user.voicePin === input) {
-        session.state = CallState.DISCOVERY;
-        const greeting = 'Identity verified. How can I help you today?';
-        twiml.say(greeting);
+    switch (session.state) {
+      case CallState.AUTHENTICATION:
+        // ✅ Use voicePin field for voice authentication
+        console.log('🔐 PIN Authentication attempt:');
+        console.log('   Expected (voicePin):', user.voicePin, 'Type:', typeof user.voicePin);
+        console.log('   Received (input):', input, 'Type:', typeof input);
+        console.log('   Match:', user.voicePin === input);
 
-        // Persist the greeting to DB
-        await SessionService.appendToSession(session.dbSessionId, session.userId, {
-          userMessage: '[PIN entered]',
-          assistantMessage: greeting,
-        });
-      } else {
-        twiml.say("Incorrect PIN. Please try again.");
-        twiml.gather({ input: ['dtmf', 'speech'], action: '/voice/process' });
-        return twiml.toString();
-      }
-      break;
+        if (user.voicePin && user.voicePin === input) {
+          session.state = CallState.DISCOVERY;
+          const greeting = 'Identity verified. How can I help you today?';
+          twiml.say(greeting);
 
-case CallState.DISCOVERY:
-            try {
-                // Track user message in history
-                session.history.push({ role: 'user', content: input });
+          // Persist the greeting to DB
+          await SessionService.appendToSession(session.dbSessionId, session.userId, {
+            userMessage: '[PIN entered]',
+            assistantMessage: greeting,
+          });
+        } else {
+          twiml.say("Incorrect PIN. Please try again.");
+          twiml.gather({ input: ['dtmf', 'speech'], action: '/voice/process' });
+          return twiml.toString();
+        }
+        break;
 
-                // Get past session context so AI can reference previous conversations
-                const pastTranscripts = await SessionService.getRecentTranscripts(session.userId, 3);
+      case CallState.DISCOVERY:
+        try {
+          // Track user message in history
+          session.history.push({ role: 'user', content: input });
 
-                // Merge past context with current conversation
-                const contextMessages = [
-                    ...pastTranscripts.map((t) => ({ role: t.role, content: t.content })),
-                    ...session.history,
-                ];
+          // Get past session context so AI can reference previous conversations
+          const pastTranscripts = await SessionService.getRecentTranscripts(session.userId, 3);
 
-                // Send to AI Orchestrator
-                const aiResponse = await AIOrchestrator.interpretMessage(input, {
-                    userProfile: {
+          // Merge past context with current conversation
+          const contextMessages = [
+            ...pastTranscripts.map((t) => ({ role: t.role, content: t.content })),
+            ...session.history,
+          ];
+
+          // Send to AI Orchestrator
+          const aiResponse = await AIOrchestrator.interpretMessage(input, {
+            userProfile: {
+              userId: session.userId,
+              timezone: user.timezone || 'America/Chicago'
+            },
+            recentMessages: contextMessages
+          });
+
+          const assistantMsg = aiResponse.assistantMessage || "I'm here to help!";
+
+          // Speak the response
+          twiml.say(assistantMsg);
+
+          // Track in memory
+          session.history.push({ role: 'assistant', content: assistantMsg });
+
+          // Persist to DB
+          await SessionService.appendToSession(session.dbSessionId, session.userId, {
+            userMessage: input,
+            assistantMessage: assistantMsg,
+          });
+
+          // Execute any actions the AI decided on
+          if (aiResponse.actions && aiResponse.actions.length > 0) {
+            for (const action of aiResponse.actions) {
+              console.log(`🚀 Executing Action: ${action.type}`);
+
+              try {
+                switch (action.type) {
+
+                  // --- BOOKING & LIFESTYLE ---
+                  case 'CREATE_BOOKING':
+                    // FIX: Cast the payload so TypeScript stops complaining
+                    const bookingData = {
+                      businessName: action.payload.businessName,
+                      datetimeLocal: new Date(action.payload.datetimeLocal).toISOString(),
+                      partySize: Number(action.payload.partySize) || 2,
+                      notes: action.payload.notes,
+                      sessionId: session.dbSessionId,
+                    } as any; // Force cast to satisfy Service
+
+                    await BookingService.createBooking(session.userId, bookingData);
+                    break;
+
+                  case 'CONFIRM_BOOKING':
+                    await BookingService.confirmBooking(session.userId, action.payload.bookingId);
+                    break;
+
+                  case 'CREATE_ACTIVITY':
+                    const activityName = action.payload?.name || action.payload?.title || action.payload?.activityName || "New Activity";
+                    const activityDateTime = action.payload?.datetime ? new Date(action.payload.datetime) : new Date();
+
+                    await prisma.activity.create({
+                      data: {
                         userId: session.userId,
-                        timezone: user.timezone || 'America/Chicago'
-                    },
-                    recentMessages: contextMessages
-                });
-
-                const assistantMsg = aiResponse.assistantMessage || "I'm here to help!";
-
-                // Speak the response
-                twiml.say(assistantMsg);
-
-                // Track in memory
-                session.history.push({ role: 'assistant', content: assistantMsg });
-
-                // Persist to DB
-                await SessionService.appendToSession(session.dbSessionId, session.userId, {
-                    userMessage: input,
-                    assistantMessage: assistantMsg,
-                });
-
-                // Execute any actions the AI decided on
-                if (aiResponse.actions && aiResponse.actions.length > 0) {
-                    for (const action of aiResponse.actions) {
-                        console.log(`🚀 Executing Action: ${action.type}`);
-
-                        try {
-                            switch (action.type) {
-                            
-                            // --- BOOKING & LIFESTYLE ---
-                            case 'CREATE_BOOKING':
-                                // FIX: Cast the payload so TypeScript stops complaining
-                                const bookingData = {
-                                    businessName: action.payload.businessName,
-                                    datetimeLocal: new Date(action.payload.datetimeLocal).toISOString(),
-                                    partySize: Number(action.payload.partySize) || 2,
-                                    notes: action.payload.notes,
-                                    sessionId: session.dbSessionId,
-                                } as any; // Force cast to satisfy Service
-
-                                await BookingService.createBooking(session.userId, bookingData);
-                                break;
-
-                            case 'CONFIRM_BOOKING':
-                                await BookingService.confirmBooking(session.userId, action.payload.bookingId);
-                                break;
-
-                            case 'CREATE_ACTIVITY':
-                                const activityName = action.payload?.name || action.payload?.title || action.payload?.activityName || "New Activity";
-                                const activityDateTime = action.payload?.datetime ? new Date(action.payload.datetime) : new Date();
-                                
-                                await prisma.activity.create({
-                                    data: {
-                                        userId: session.userId,
-                                        sessionId: session.dbSessionId,
-                                        name: activityName,
-                                        type: action.payload?.type || 'GENERAL',
-                                        durationMin: action.payload?.duration || action.payload?.durationMin || 60,
-                                        datetimeLocal: activityDateTime
-                                    }
-                                });
+                        sessionId: session.dbSessionId,
+                        name: activityName,
+                        type: action.payload?.type || 'GENERAL',
+                        durationMin: action.payload?.duration || action.payload?.durationMin || 60,
+                        datetimeLocal: activityDateTime
+                      }
+                    });
 
 
-                                break;
+                    break;
 
-                            // --- FINANCE ---
-                            case 'SET_BUDGET':
-                                await prisma.budget.create({
-                                    data: {
-                                        userId: session.userId,
-                                        category: action.payload.category,
-                                        limitAmount: action.payload.amount,
-                                        period: action.payload.period || 'MONTHLY'
-                                    }
-                                });
-                                break;
+                  // --- FINANCE ---
+                  case 'SET_BUDGET':
+                    await prisma.budget.create({
+                      data: {
+                        userId: session.userId,
+                        category: action.payload.category,
+                        limitAmount: action.payload.amount,
+                        period: action.payload.period || 'MONTHLY'
+                      }
+                    });
+                    break;
 
-                            case 'ADD_EXPENSE':
-                               await prisma.expense.create({
-                                data: {
-                                    userId: session.userId,
-                                    budgetId: action.payload.budgetId, // required
-                                    merchant: action.payload.merchant,
-                                    amount: action.payload.amount,
-                                    datetimeLocal: new Date(action.payload.date)
-                                }
-                                });
-                                break;
+                  case 'ADD_EXPENSE':
+                    await prisma.expense.create({
+                      data: {
+                        userId: session.userId,
+                        budgetId: action.payload.budgetId, // required
+                        merchant: action.payload.merchant,
+                        amount: action.payload.amount,
+                        datetimeLocal: new Date(action.payload.date)
+                      }
+                    });
+                    break;
 
-                            // --- GOALS & PRODUCTIVITY ---
-                            case 'CREATE_GOAL':
-                                await prisma.goal.create({
-                                data: {
-                                    userId: session.userId,
-                                    title: action.payload.title,
-                                    metric: action.payload.metric || "general",
-                                    targetAmount: action.payload.targetAmount,
-                                    frequency: action.payload.frequency || "MONTHLY",
-                                    category: action.payload.category || "GENERAL"
-                                }
-                                });
+                  // --- GOALS & PRODUCTIVITY ---
+                  case 'CREATE_GOAL':
+                    await prisma.goal.create({
+                      data: {
+                        userId: session.userId,
+                        title: action.payload.title,
+                        metric: action.payload.metric || "general",
+                        targetAmount: action.payload.targetAmount,
+                        frequency: action.payload.frequency || "MONTHLY",
+                        category: action.payload.category || "GENERAL"
+                      }
+                    });
 
-                                break;
+                    break;
 
-                            case 'GENERATE_GOAL_PLAN':
-                                // Complex logic -> Delegate to a dedicated service
-                                await GoalService.generateGoalPlan(session.userId, action.payload.goalId);
-                                break;
+                  case 'GENERATE_GOAL_PLAN':
+                    // Complex logic -> Delegate to a dedicated service
+                    await GoalService.generateGoalPlan(session.userId, action.payload.goalId);
+                    break;
 
-                            case 'CREATE_REMINDER':
-                                await prisma.reminder.create({
-                                data: {
-                                    userId: session.userId,
-                                    title: action.payload.title,
-                                    remindAt: new Date(action.payload.datetime),
-                                    isSent: false
-                                }
-                                });
+                  case 'CREATE_REMINDER':
+                    await prisma.reminder.create({
+                      data: {
+                        userId: session.userId,
+                        title: action.payload.title,
+                        remindAt: new Date(action.payload.datetime),
+                        isSent: false
+                      }
+                    });
 
-                                break;
+                    break;
 
-                          /*  case 'EXPORT_CALENDAR_EVENT':
-                                await CalendarService.addToUserCalendar(session.userId, {
-                                    title: action.payload.title,
-                                    start: new Date(action.payload.startDatetime),
-                                    end: new Date(action.payload.endDatetime),
-                                    location: action.payload.location
-                                });
-                                break;
-                                */
+                  /*  case 'EXPORT_CALENDAR_EVENT':
+                        await CalendarService.addToUserCalendar(session.userId, {
+                            title: action.payload.title,
+                            start: new Date(action.payload.startDatetime),
+                            end: new Date(action.payload.endDatetime),
+                            location: action.payload.location
+                        });
+                        break;
+                        */
 
-                            default:
-                                console.warn(`⚠️ Unhandled action type: ${action.type}`);
-                                break;
-                        }
-                        } catch (actionErr) {
-                            console.error(`❌ Action ${action.type} failed:`, actionErr);
-                        }
-                    }
+                  default:
+                    console.warn(`⚠️ Unhandled action type: ${action.type}`);
+                    break;
                 }
-            } catch (error) {
-                console.error("Error in CallState.DISCOVERY:", error);
-                twiml.say("I'm sorry, I had trouble processing that. Could you say it again?");
+              } catch (actionErr) {
+                console.error(`❌ Action ${action.type} failed:`, actionErr);
+              }
             }
-            break;
+          }
+        } catch (error) {
+          console.error("Error in CallState.DISCOVERY:", error);
+          twiml.say("I'm sorry, I had trouble processing that. Could you say it again?");
+        }
+        break;
 
-    case CallState.ACTION:
-      const businessName = input;
+      case CallState.ACTION:
+        const businessName = input;
 
-      await BookingService.createBooking(session.userId, {
-        businessName,
-        datetimeLocal: new Date().toISOString(),
-        partySize: 2,
-        sessionId: session.dbSessionId,
-      });
+        await BookingService.createBooking(session.userId, {
+          businessName,
+          datetimeLocal: new Date().toISOString(),
+          partySize: 2,
+          sessionId: session.dbSessionId,
+        });
 
-      twiml.say(`I have created a draft booking for ${businessName}. Check your app to confirm the time.`);
-      session.state = CallState.DISCOVERY;
-      break;
+        twiml.say(`I have created a draft booking for ${businessName}. Check your app to confirm the time.`);
+        session.state = CallState.DISCOVERY;
+        break;
+    }
+
+    if (session.state !== CallState.HANDOFF) {
+      twiml.gather({ input: ['speech'], action: '/voice/process', timeout: 5 });
+    }
+
+    return twiml.toString();
   }
-
-  if (session.state !== CallState.HANDOFF) {
-    twiml.gather({ input: ['speech'], action: '/voice/process', timeout: 5 });
-  }
-
-  return twiml.toString();
-}
 
   // 3. Handle call end (cleanup + persist)
   static async handleCallEnd(callSid: string): Promise<void> {

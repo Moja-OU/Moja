@@ -35,9 +35,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Moja API is running' });
 });
 
-// ============================================================================
 // AUTH ROUTES
-// ============================================================================
 
 app.post('/auth/register', async (req, res) => {
   try {
@@ -80,28 +78,18 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-app.post('/auth/demo', async (_req, res) => {
-  try {
-    const result = await AuthService.createDemoUser();
-    res.status(201).json(result);
-  } catch (error) {
-    res.status(500).json({
-      error: error instanceof Error ? error.message : 'Demo user creation failed',
-    });
-  }
-});
 
-// ============================================================================
+
 // DASHBOARD ROUTE
-// ============================================================================
 
 app.get('/dashboard', authMiddleware, async (req, res) => {
   try {
     const userId = req.user!.userId;
 
     // Fetch all dashboard data in parallel
-    const [sessions, upcomingBookings, upcomingActivities, goals, budgets, recentExpenses] =
+    const [user, sessions, upcomingBookings, upcomingActivities, goals, budgets, recentExpenses] =
       await Promise.all([
+        AuthService.getUserById(userId),
         SessionService.getUserSessions(userId, 10),
         BookingService.getUpcoming(userId),
         SchedulingService.getUpcoming(userId),
@@ -111,6 +99,7 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
       ]);
 
     res.json({
+      user: { name: user.name, email: user.email },
       sessions,
       upcomingBookings,
       upcomingActivities,
@@ -127,9 +116,7 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // SESSION ROUTES
-// ============================================================================
 
 app.post('/sessions/start', authMiddleware, async (req, res) => {
   try {
@@ -199,9 +186,7 @@ app.get('/sessions', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // AI EXECUTE ROUTE (CORE ENDPOINT)
-// ============================================================================
 
 app.post('/ai/execute', authMiddleware, async (req, res) => {
   try {
@@ -368,7 +353,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
       let budgetId = action.payload.budgetId;
       if (!budgetId && action.payload.category) {
         const budgets = await BudgetService.getCurrentBudgets(userId);
-        const match = budgets.find((b: any) => 
+        const match = budgets.find((b: any) =>
           b.category.toLowerCase() === action.payload.category.toLowerCase()
         );
         if (match) budgetId = match.id;
@@ -394,9 +379,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
   }
 }
 
-// ============================================================================
 // BOOKING ROUTES
-// ============================================================================
 
 app.post('/bookings', authMiddleware, async (req, res) => {
   try {
@@ -445,9 +428,7 @@ app.get('/bookings/upcoming', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // ACTIVITY ROUTES
-// ============================================================================
 
 app.post('/activities', authMiddleware, async (req, res) => {
   try {
@@ -496,9 +477,7 @@ app.get('/activities/upcoming', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // GOAL ROUTES
-// ============================================================================
 
 app.post('/goals', authMiddleware, async (req, res) => {
   try {
@@ -536,9 +515,7 @@ app.get('/goals', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // BUDGET & EXPENSE ROUTES
-// ============================================================================
 
 app.post('/budgets', authMiddleware, async (req, res) => {
   try {
@@ -587,9 +564,7 @@ app.get('/budgets/current', authMiddleware, async (req, res) => {
   }
 });
 
-// ============================================================================
 // CALENDAR ROUTES
-// ============================================================================
 
 app.get('/calendar/booking/:id.ics', authMiddleware, async (req, res) => {
   try {
@@ -683,6 +658,10 @@ app.post('/notify/check', authMiddleware, async (_req, res) => {
 
 app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
   try {
+    // Debug logging to file
+    const logData = `[${new Date().toISOString()}] Incoming Call\nHeaders: ${JSON.stringify(req.headers)}\nBody: ${JSON.stringify(req.body)}\n\n`;
+    require('fs').appendFileSync('debug_voice.log', logData);
+
     const { CallSid, From } = req.body;
     console.log(`📞 Incoming call from ${From}`);
 
@@ -694,7 +673,9 @@ app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
     res.send(twiml);
   } catch (error) {
     console.error("Voice Error:", error);
-    res.status(500).send('<Response><Say>System error.</Say></Response>');
+    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Error: ${error}\n\n`);
+    // Return 200 OK even on error so Twilio plays the message
+    res.status(200).send('<Response><Say>System error occurred. Check logs.</Say></Response>');
   }
 });
 
@@ -730,13 +711,33 @@ app.post('/voice/status', async (req, res) => {
   }
 });
 
-// ============================================================================
-// START SERVER
-// ============================================================================
+// START SERVER WITH WEBSOCKET SUPPORT
+
+import { WebSocketServer } from 'ws';
+import { VoiceRealtimeService } from './services/voice-realtime.service';
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Moja API running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+});
+
+// Initialize WebSocket Server
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws, req) => {
+  const fs = require('fs');
+  fs.appendFileSync('debug_ws.log', `[${new Date().toISOString()}] Connection request: ${req.url}\n`);
+  console.log('🔌 New WebSocket connection:', req.url);
+
+  // Check path (allow query params)
+  if (req.url?.startsWith('/voice/stream')) {
+    const voiceService = new VoiceRealtimeService(ws);
+    voiceService.handleConnection();
+  } else {
+    console.log('❌ Unknown WebSocket path:', req.url);
+    fs.appendFileSync('debug_ws.log', `[${new Date().toISOString()}] REJECTED: ${req.url}\n`);
+    ws.close();
+  }
 });
 
 server.on('error', (err) => {

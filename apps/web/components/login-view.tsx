@@ -10,7 +10,7 @@ import { Headphones } from "lucide-react"
 import { APIClient } from "@/lib/api"
 
 interface LoginViewProps {
-  onLogin: () => void
+  onLogin: (user: { name: string; email: string }) => void
 }
 
 export function LoginView({ onLogin }: LoginViewProps) {
@@ -34,7 +34,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
     try {
       const response = await APIClient.login(email, password)
       toast.success("Login successful!")
-      onLogin()
+      onLogin(response.user)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Login failed")
     } finally {
@@ -42,19 +42,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
     }
   }
 
-  const handleDemoLogin = async () => {
-    setIsLoading(true)
-    try {
-      // Use test credentials
-      await APIClient.login("test@moja.com", "1234")
-      toast.success("Demo login successful!")
-      onLogin()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Demo login failed")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isLoading) {
@@ -82,7 +70,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
             <Input
               id="email"
               type="email"
-              placeholder="test@moja.com"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -111,24 +99,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
           >
             {isLoading ? "Logging in..." : "Login"}
           </Button>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-card px-2 text-muted-foreground">or</span>
-            </div>
-          </div>
-          <Button
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
-            onClick={handleDemoLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? "Logging in..." : "Demo Login"}
-          </Button>
-          <p className="text-center text-[11px] text-muted-foreground">
-            Fast demo mode (no real PSTN)
-          </p>
+
         </CardContent>
       </Card>
     </div>

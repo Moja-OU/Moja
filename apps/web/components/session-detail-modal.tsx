@@ -60,7 +60,7 @@ export function SessionDetailModal({ session, open, onClose }: SessionDetailModa
               Intent Tags
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {session.intentTags.map((tag) => (
+              {(session.intentTags || []).map((tag) => (
                 <Badge
                   key={tag}
                   variant="outline"
@@ -79,8 +79,14 @@ export function SessionDetailModal({ session, open, onClose }: SessionDetailModa
             </p>
             <ScrollArea className="h-52 rounded-lg bg-secondary/50 p-3">
               <div className="flex flex-col gap-2">
-                {session.transcript.map((line, i) => {
-                  const isUser = line.startsWith("User:")
+                {(session.transcript || []).map((line: any, i) => {
+                  // Handle both string (legacy) and object (new) formats
+                  const isString = typeof line === "string"
+                  const content = isString ? line : line.content
+                  const isUser = isString
+                    ? line.startsWith("User:")
+                    : line.role === "user"
+
                   return (
                     <p
                       key={`line-${i}`}
@@ -90,7 +96,7 @@ export function SessionDetailModal({ session, open, onClose }: SessionDetailModa
                           : "text-xs text-foreground/70"
                       }
                     >
-                      {line}
+                      {content}
                     </p>
                   )
                 })}
