@@ -10,7 +10,7 @@ export class SessionService {
   /**
    * Start a new session
    */
-  static async startSession(userId: string, channel: 'VOICE' | 'CHAT', twilioCallSid?: string) {
+  static async startSession(userId: string, channel: 'VOICE' | 'CHAT' | 'SMS', twilioCallSid?: string) {
     const session = await prisma.session.create({
       data: {
         userId,

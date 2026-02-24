@@ -12,6 +12,7 @@ import { BudgetService } from './services/budget.service';
 import { CalendarService } from './services/calendar.service';
 import { NotificationService } from './services/notification.service';
 import { VoiceService } from './services/voice.service';
+import { SmsService } from './services/sms.service';
 
 dotenv.config();
 
@@ -123,8 +124,8 @@ app.post('/sessions/start', authMiddleware, async (req, res) => {
     const userId = req.user!.userId;
     const { channel } = req.body;
 
-    if (!channel || !['VOICE', 'CHAT'].includes(channel)) {
-      return res.status(400).json({ error: 'Valid channel (VOICE|CHAT) required' });
+    if (!channel || !['VOICE', 'CHAT', 'SMS'].includes(channel)) {
+      return res.status(400).json({ error: 'Valid channel (VOICE|CHAT|SMS) required' });
     }
 
     const session = await SessionService.startSession(userId, channel);
@@ -708,6 +709,36 @@ app.post('/voice/status', async (req, res) => {
   } catch (error) {
     console.error('Voice status error:', error);
     res.sendStatus(500);
+  }
+});
+
+// ============================================================================
+// SMS ROUTES
+// ============================================================================
+
+app.post(['/sms/incoming', '/sms/incoming/'], async (req, res) => {
+  try {
+    const { From, Body } = req.body;
+    console.log(`📱 Incoming SMS from ${From}: "${Body}"`);
+
+    // Process the SMS through our service
+    const replyText = await SmsService.handleIncomingSms(From, Body || '');
+
+    // Respond with TwiML so Twilio sends our reply as SMS
+    const MessagingResponse = require('twilio').twiml.MessagingResponse;
+    const twiml = new MessagingResponse();
+    twiml.message(replyText);
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  } catch (error) {
+    console.error('❌ SMS Error:', error);
+    // Return a friendly error via SMS
+    const MessagingResponse = require('twilio').twiml.MessagingResponse;
+    const twiml = new MessagingResponse();
+    twiml.message('⚠️ Moja encountered an error. Please try again in a moment.');
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
