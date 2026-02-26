@@ -13,6 +13,7 @@
     "generate:prisma": "prisma generate"
   },
   "dependencies": {
+    "@google/genai": "^1.42.0",
     "@moja/types": "workspace:*",
     "@moja/utils": "workspace:*",
     "@prisma/client": "^5.9.1",
