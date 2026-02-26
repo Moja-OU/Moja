@@ -53,7 +53,7 @@ export class VoiceService {
     });
 
     if (!user) {
-      console.log("❌ User not found for number:", fromNumber);
+      console.log("User not found for number:", fromNumber);
       twiml.say("Phone number not recognized. Goodbye.");
       twiml.hangup();
       return twiml.toString();
@@ -68,8 +68,7 @@ export class VoiceService {
     const webhookUrl = process.env.TWILIO_WEBHOOK_URL;
     const wssUrl = `wss://${webhookUrl?.replace('https://', '').replace('http://', '')}/voice/stream`;
 
-    console.log(`🔗 Generated WebSocket URL: ${wssUrl}`);
-    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Generating TwiML with URL: ${wssUrl}\n`);
+    console.log(`WebSocket URL: ${wssUrl}`);
 
     const connect = twiml.connect();
     const stream = connect.stream({
@@ -82,10 +81,7 @@ export class VoiceService {
       value: user.id
     });
 
-    const response = twiml.toString();
-    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Generated TwiML: ${response}\n`);
-
-    return response;
+    return twiml.toString();
   }
 
 
@@ -175,7 +171,7 @@ export class VoiceService {
           // Execute any actions the AI decided on
           if (aiResponse.actions && aiResponse.actions.length > 0) {
             for (const action of aiResponse.actions) {
-              console.log(`🚀 Executing Action: ${action.type}`);
+              console.log(`Executing Action: ${action.type}`);
 
               try {
                 switch (action.type) {
@@ -283,11 +279,11 @@ export class VoiceService {
                         */
 
                   default:
-                    console.warn(`⚠️ Unhandled action type: ${action.type}`);
+                    console.warn(`Unhandled action type: ${action.type}`);
                     break;
                 }
               } catch (actionErr) {
-                console.error(`❌ Action ${action.type} failed:`, actionErr);
+                console.error(`Action ${action.type} failed:`, actionErr);
               }
             }
           }

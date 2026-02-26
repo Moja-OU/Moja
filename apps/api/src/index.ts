@@ -18,10 +18,10 @@ dotenv.config();
 
 // Crash handlers — surface silent exits
 process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught exception:', err);
+  console.error('Uncaught exception:', err);
 });
 process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled rejection:', err);
+  console.error('Unhandled rejection:', err);
 });
 
 const app = express();
@@ -212,7 +212,7 @@ app.post('/ai/execute', authMiddleware, async (req, res) => {
     });
 
     // Execute actions
-    console.log(`\n📋 AI returned ${aiResponse.actions.length} action(s), ${aiResponse.missingFields.length} missing field(s)`);
+    console.log(`\nAI returned ${aiResponse.actions.length} action(s), ${aiResponse.missingFields.length} missing field(s)`);
     if (aiResponse.actions.length > 0) {
       console.log('   Actions:', aiResponse.actions.map(a => a.type).join(', '));
     }
@@ -225,16 +225,16 @@ app.post('/ai/execute', authMiddleware, async (req, res) => {
     for (const action of aiResponse.actions) {
       // Validate action
       if (!AIOrchestrator.validateAction(action)) {
-        console.warn('⚠️ Invalid action skipped:', JSON.stringify(action));
+        console.warn('Invalid action skipped:', JSON.stringify(action));
         continue;
       }
 
       try {
         const result = await executeAction(userId, action, sessionId);
         executedActions.push({ ...action, result });
-        console.log(`✅ Action ${action.type} completed successfully`);
+        console.log(`Action ${action.type} completed`);
       } catch (error) {
-        console.error(`❌ Action ${action.type} failed:`, error);
+        console.error(`Action ${action.type} failed:`, error);
         executedActions.push({
           ...action,
           error: error instanceof Error ? error.message : 'Execution failed',
@@ -278,7 +278,7 @@ app.post('/ai/execute', authMiddleware, async (req, res) => {
 
 // Helper function to execute actions
 async function executeAction(userId: string, action: AIAction, sessionId?: string) {
-  console.log(`\n🚀 [executeAction] Type: ${action.type}`);
+  console.log(`\n[executeAction] Type: ${action.type}`);
   console.log(`   Payload:`, JSON.stringify(action.payload, null, 2));
 
   switch (action.type) {
@@ -291,7 +291,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
         notes: action.payload.notes,
         sessionId,
       });
-      console.log(`   ✅ Booking created: ${result.id}`);
+      console.log(`   Booking created: ${result.id}`);
       return result;
     }
 
@@ -360,7 +360,7 @@ async function executeAction(userId: string, action: AIAction, sessionId?: strin
         if (match) budgetId = match.id;
       }
       if (!budgetId) {
-        console.warn('   ⚠️ No budgetId and no matching category budget found — skipping expense');
+        console.warn('   No budgetId and no matching category budget found, skipping expense');
         return { skipped: true, reason: 'No budget found for expense' };
       }
       const result = await BudgetService.addExpense(userId, budgetId, {
@@ -659,12 +659,8 @@ app.post('/notify/check', authMiddleware, async (_req, res) => {
 
 app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
   try {
-    // Debug logging to file
-    const logData = `[${new Date().toISOString()}] Incoming Call\nHeaders: ${JSON.stringify(req.headers)}\nBody: ${JSON.stringify(req.body)}\n\n`;
-    require('fs').appendFileSync('debug_voice.log', logData);
-
     const { CallSid, From } = req.body;
-    console.log(`📞 Incoming call from ${From}`);
+    console.log(`Incoming call from ${From} (${CallSid})`);
 
     // Generate TwiML instructions for Twilio
     const twiml = await VoiceService.handleIncomingCall(CallSid, From);
@@ -673,23 +669,21 @@ app.post(['/voice/incoming', '/voice/incoming/'], async (req, res) => {
     res.type('text/xml');
     res.send(twiml);
   } catch (error) {
-    console.error("Voice Error:", error);
-    require('fs').appendFileSync('debug_voice.log', `[${new Date().toISOString()}] Error: ${error}\n\n`);
-    // Return 200 OK even on error so Twilio plays the message
-    res.status(200).send('<Response><Say>System error occurred. Check logs.</Say></Response>');
+    console.error('Voice incoming error:', error);
+    res.status(200).send('<Response><Say>System error occurred. Please try again.</Say></Response>');
   }
 });
 
 app.post('/voice/process', async (req, res) => {
   try {
     const { CallSid, SpeechResult, Digits } = req.body;
-    console.log(`🎤 Voice input — CallSid: ${CallSid}, Speech: "${SpeechResult || ''}", Digits: "${Digits || ''}"`)
+    console.log(`Voice input - CallSid: ${CallSid}, Speech: "${SpeechResult || ''}", Digits: "${Digits || ''}"`);
     const xmlResponse = await VoiceService.processInput(CallSid, SpeechResult, Digits);
 
     res.type('text/xml');
     res.send(xmlResponse);
   } catch (error) {
-    console.error('❌ Voice process error:', error);
+    console.error('Voice process error:', error);
     res.type('text/xml');
     res.send('<Response><Say>I had trouble processing that. Could you say it again?</Say><Gather input="speech" action="/voice/process" timeout="5"/></Response>');
   }
@@ -699,7 +693,7 @@ app.post('/voice/process', async (req, res) => {
 app.post('/voice/status', async (req, res) => {
   try {
     const { CallSid, CallStatus } = req.body;
-    console.log(`📞 Call ${CallSid} status: ${CallStatus}`);
+    console.log(`Call ${CallSid} status: ${CallStatus}`);
 
     if (CallStatus === 'completed' || CallStatus === 'failed' || CallStatus === 'canceled') {
       await VoiceService.handleCallEnd(CallSid);
@@ -719,7 +713,7 @@ app.post('/voice/status', async (req, res) => {
 app.post(['/sms/incoming', '/sms/incoming/'], async (req, res) => {
   try {
     const { From, Body } = req.body;
-    console.log(`📱 Incoming SMS from ${From}: "${Body}"`);
+    console.log(`Incoming SMS from ${From}: "${Body}"`);
 
     // Process the SMS through our service
     const replyText = await SmsService.handleIncomingSms(From, Body || '');
@@ -732,7 +726,7 @@ app.post(['/sms/incoming', '/sms/incoming/'], async (req, res) => {
     res.type('text/xml');
     res.send(twiml.toString());
   } catch (error) {
-    console.error('❌ SMS Error:', error);
+    console.error('SMS Error:', error);
     // Return a friendly error via SMS
     const MessagingResponse = require('twilio').twiml.MessagingResponse;
     const twiml = new MessagingResponse();
@@ -748,29 +742,25 @@ import { WebSocketServer } from 'ws';
 import { VoiceRealtimeService } from './services/voice-realtime.service';
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Moja API running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`Moja API running on http://localhost:${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
 });
 
 // Initialize WebSocket Server
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
-  const fs = require('fs');
-  fs.appendFileSync('debug_ws.log', `[${new Date().toISOString()}] Connection request: ${req.url}\n`);
-  console.log('🔌 New WebSocket connection:', req.url);
+  console.log('WebSocket connection:', req.url);
 
-  // Check path (allow query params)
   if (req.url?.startsWith('/voice/stream')) {
     const voiceService = new VoiceRealtimeService(ws);
     voiceService.handleConnection();
   } else {
-    console.log('❌ Unknown WebSocket path:', req.url);
-    fs.appendFileSync('debug_ws.log', `[${new Date().toISOString()}] REJECTED: ${req.url}\n`);
+    console.log('Unknown WebSocket path, closing:', req.url);
     ws.close();
   }
 });
 
 server.on('error', (err) => {
-  console.error('❌ Server error:', err);
+  console.error('Server error:', err);
 });

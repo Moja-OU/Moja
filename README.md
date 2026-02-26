@@ -21,12 +21,13 @@ One phone call replaces the assistant that Big Tech gatekeeps behind expensive h
 
 ```
 apps/
-  web/     → Next.js frontend (localhost:3000)
-  api/     → Express + Prisma API (localhost:4000)
+  web/       -> Next.js frontend (localhost:3000)
+  api/       -> Express + Prisma API (localhost:4000)
+    scripts/ -> Dev helper scripts (create-user, test-sms, etc.)
 packages/
-  types/   → Shared TypeScript types
-  ui/      → Shared React components
-  utils/   → Shared utility functions
+  types/     -> Shared TypeScript types
+  ui/        -> Shared React components
+  utils/     -> Shared utility functions
 ```
 
 ## Tech Stack
@@ -83,10 +84,10 @@ DATABASE_URL="file:./dev.db"
 
 # Auth
 JWT_SECRET="your-jwt-secret"
-JWT_EXPIRES_IN="7d"
 
 # Google Gemini (https://aistudio.google.com/)
 GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_TEXT_MODEL="gemini-2.5-flash"
 GEMINI_MODEL="gemini-2.5-flash-native-audio-latest"
 
 # Twilio (https://console.twilio.com/)
@@ -100,7 +101,6 @@ TAVILY_API_KEY="your-tavily-key"
 
 # Server
 PORT=4000
-NODE_ENV="development"
 ```
 
 ## Voice Setup (for local dev)
@@ -109,6 +109,30 @@ NODE_ENV="development"
 2. Set `TWILIO_WEBHOOK_URL` in `.env` to the ngrok URL
 3. In the [Twilio console](https://console.twilio.com), set your phone number's webhook to `https://your-ngrok-url/voice/incoming`
 4. Call your Twilio number — Moja will answer!
+
+## SMS Setup (for local dev)
+
+1. In the [Twilio console](https://console.twilio.com), set your phone number's SMS webhook to `https://your-ngrok-url/sms/incoming`
+2. Text your Twilio number — authenticate with your PIN, then chat!
+3. To test locally without Twilio credits:
+   ```bash
+   cd apps/api && node scripts/test-sms.js --from "+1YOURNUMBER"
+   ```
+
+## Dev Scripts
+
+Helper scripts live in `apps/api/scripts/`:
+
+| Script | Purpose |
+|--------|----------|
+| `create-user.js` | Create/reset a test user |
+| `set-pin.js` | Set a user's voice PIN |
+| `test-sms.js` | Interactive SMS simulator (no Twilio needed) |
+| `check-user.js` | Inspect a user record |
+| `check-data.js` | View user's sessions, bookings, activities |
+| `check-sms.js` | View recent SMS session transcripts |
+
+Run from `apps/api/`: `node scripts/<script-name>.js`
 
 ---
 

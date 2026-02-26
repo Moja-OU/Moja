@@ -149,7 +149,7 @@ export class AIOrchestrator {
   ): Promise<AIResponse> {
     try {
       const systemPrompt = this.buildSystemPrompt(context);
-      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.0-flash';
+      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 
       // Build conversation contents for Gemini
       const contents: any[] = [];
@@ -165,15 +165,34 @@ export class AIOrchestrator {
       // Add the current user message
       contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
+      // Helper: retry with backoff for 429 rate-limit errors
+      const callWithRetry = async (callContents: any[]) => {
+        const MAX_RETRIES = 3;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            return await getGemini().models.generateContent({
+              model,
+              contents: callContents,
+              config: {
+                systemInstruction: systemPrompt,
+                tools: [{ functionDeclarations: this.getGeminiTools() }],
+              },
+            });
+          } catch (err: any) {
+            if (err?.status === 429 && attempt < MAX_RETRIES - 1) {
+              const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s
+              console.warn(`⏳ Rate limited (429). Retrying in ${delay / 1000}s... (attempt ${attempt + 1}/${MAX_RETRIES})`);
+              await new Promise(r => setTimeout(r, delay));
+              continue;
+            }
+            throw err;
+          }
+        }
+        throw new Error('Max retries exceeded');
+      };
+
       // --- PASS 1: Let AI decide (Search vs Talk vs Act) ---
-      let response = await getGemini().models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction: systemPrompt,
-          tools: [{ functionDeclarations: this.getGeminiTools() }],
-        },
-      });
+      let response = await callWithRetry(contents);
 
       let candidate = response.candidates?.[0];
       let parts = candidate?.content?.parts || [];
@@ -184,7 +203,7 @@ export class AIOrchestrator {
       // --- BRANCH A: Handle Search (if applicable) ---
       if (functionCall && functionCall.name === 'perform_search') {
         const searchArgs = functionCall.args as any;
-        console.log(`🕵️ Searching for: ${searchArgs.query}`);
+        console.log(`[Search] query: ${searchArgs.query}`);
 
         // 1. Execute Search
         const searchData = await getTavily().search(searchArgs.query, { maxResults: 5 });
@@ -205,14 +224,7 @@ export class AIOrchestrator {
         });
 
         // 3. PASS 2: AI processes results -> Decides to Talk or Act
-        response = await getGemini().models.generateContent({
-          model,
-          contents,
-          config: {
-            systemInstruction: systemPrompt,
-            tools: [{ functionDeclarations: this.getGeminiTools() }],
-          },
-        });
+        response = await callWithRetry(contents);
 
         candidate = response.candidates?.[0];
         parts = candidate?.content?.parts || [];
@@ -222,8 +234,8 @@ export class AIOrchestrator {
       // --- BRANCH B: Handle Actions ---
       if (functionCall && functionCall.name === 'execute_actions') {
         const result = functionCall.args as any;
-        console.log(`\n🤖 AI tool call: execute_actions`);
-        console.log(`   assistant_message: ${result.assistant_message}`);
+        console.log(`\n[AI] tool call: execute_actions`);
+        console.log(`   message: ${result.assistant_message}`);
         console.log(`   missing_fields: ${JSON.stringify(result.missing_fields)}`);
         console.log(`   actions (${(result.actions || []).length}):`, JSON.stringify(result.actions, null, 2));
         return {
@@ -235,7 +247,7 @@ export class AIOrchestrator {
 
       // --- Plain text response (no tool call) ---
       const textContent = parts.find((p: any) => p.text)?.text || '';
-      console.log(`\n🤖 AI responded with plain text (no tool call). Content: ${textContent.substring(0, 100)}...`);
+      console.log(`\n[AI] plain text response (no tool call). Content: ${textContent.substring(0, 100)}...`);
       return {
         assistantMessage: textContent || "I'm here to help! What's on your mind?",
         missingFields: [],
@@ -243,14 +255,22 @@ export class AIOrchestrator {
       };
 
     } catch (error: any) {
-      console.error('❌ AI Orchestrator error:', error?.message || error);
+      console.error('AI Orchestrator error:', error?.message || error);
       console.error('   Stack:', error?.stack);
       console.error('   Status:', error?.status);
       console.error('   Code:', error?.code);
       // Write to debug file
       const fs = require('fs');
       fs.appendFileSync('debug_ai.log', `[${new Date().toISOString()}] AI Error:\n  Message: ${error?.message}\n  Status: ${error?.status}\n  Code: ${error?.code}\n  Stack: ${error?.stack}\n  Full: ${JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2)}\n\n`);
-      return { assistantMessage: "I encountered a system error.", missingFields: [], actions: [] };
+
+      // Return user-friendly messages based on error type
+      let userMessage = "I'm sorry, I encountered an unexpected error. Please try again.";
+      if (error?.status === 429) {
+        userMessage = "I'm experiencing high demand right now. Please try again in a moment.";
+      } else if (error?.status === 404) {
+        userMessage = "AI service configuration error. Please contact support.";
+      }
+      return { assistantMessage: userMessage, missingFields: [], actions: [] };
     }
   }
   private static buildSystemPrompt(context: AIContext): string {

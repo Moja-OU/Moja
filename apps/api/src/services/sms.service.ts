@@ -46,7 +46,7 @@ function cleanExpiredSessions() {
     const now = Date.now();
     for (const phone of Object.keys(activeSessions)) {
         if (now - activeSessions[phone].lastActivity > SESSION_TIMEOUT_MS) {
-            console.log(`🕐 SMS session expired for ${phone}`);
+            console.log(`SMS session expired for ${phone}`);
             delete activeSessions[phone];
         }
     }
@@ -221,13 +221,13 @@ export class SmsService {
 
             // Log actions if any (for future expansion)
             if (aiResponse.actions && aiResponse.actions.length > 0) {
-                console.log(`📱 SMS actions for ${fromNumber}:`, aiResponse.actions.map(a => a.type).join(', '));
+                console.log(`SMS actions for ${fromNumber}:`, aiResponse.actions.map(a => a.type).join(', '));
             }
 
             return truncateForSms(assistantMsg);
 
         } catch (error) {
-            console.error(`❌ SMS AI error for ${fromNumber}:`, error);
+            console.error(`SMS AI error for ${fromNumber}:`, error);
             return `⚠️ Sorry, I had trouble processing that. Could you try rephrasing?`;
         }
     }
@@ -280,9 +280,9 @@ export class SmsService {
                 from: process.env.TWILIO_PHONE_NUMBER,
                 to: toNumber,
             });
-            console.log(`📤 SMS sent to ${toNumber}`);
+            console.log(`SMS sent to ${toNumber}`);
         } catch (error) {
-            console.error(`❌ Failed to send SMS to ${toNumber}:`, error);
+            console.error(`Failed to send SMS to ${toNumber}:`, error);
             throw error;
         }
     }
