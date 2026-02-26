@@ -10,7 +10,7 @@ async function main() {
     update: {
       name: 'test',
       passwordHash,
-      phone: '+14052238806',
+      phone: '+10000000000',
       voicePin: '1234',
       timezone: 'America/Oklahoma_City',
     },
@@ -18,9 +18,9 @@ async function main() {
       email: 'test@moja.com',
       name: 'test',
       passwordHash,
-      phone: '+14052238806',
+      phone: '+10000000000',
       voicePin: '1234',
-      timezone: 'America/Oklahoma_City',
+      timezone: 'America/Chicago',
     },
   });
 

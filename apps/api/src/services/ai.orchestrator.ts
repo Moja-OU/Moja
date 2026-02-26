@@ -1,19 +1,17 @@
 /* this file is the brain of the application */
 
-import { AzureOpenAI } from 'openai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { tavily } from "@tavily/core";
 
 // --- Lazy-initialized SDK clients (created after dotenv.config() runs) ---
-let _openai: AzureOpenAI | null = null;
-function getOpenAI(): AzureOpenAI {
-  if (!_openai) {
-    _openai = new AzureOpenAI({
-      apiKey: process.env.AZURE_OPENAI_KEY,
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2025-01-01-preview',
+let _gemini: GoogleGenAI | null = null;
+function getGemini(): GoogleGenAI {
+  if (!_gemini) {
+    _gemini = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
     });
   }
-  return _openai;
+  return _gemini;
 }
 
 let _tvly: ReturnType<typeof tavily> | null = null;
@@ -62,92 +60,71 @@ export interface AIContext {
 export class AIOrchestrator {
 
   /**
-   * Main entry point: Interpret user message, searching if necessary, 
-   * and returning structured actions.
+   * Returns the Gemini function declarations for tools (Search + Actions).
    */
-
-  /**
-   * Returns the definitions for all available tools (Search + Actions).
-   */
-  private static getTools() {
+  private static getGeminiTools(): any[] {
     return [
       // 1. SEARCH TOOL (Tavily)
       {
-        type: 'function',
-        function: {
-          name: 'perform_search',
-          description: 'Search the web for real-time information. Use this for weather, checking if a restaurant is open, finding addresses, or looking up current events.',
-          parameters: {
-            type: 'object',
-            properties: {
-              query: {
-                type: 'string',
-                description: 'The search query (e.g., "Weather in Miami", "The Library restaurant address St. Louis", "Movies playing near me")'
-              }
-            },
-            required: ['query']
-          }
+        name: 'perform_search',
+        description: 'Search the web for real-time information. Use this for weather, checking if a restaurant is open, finding addresses, or looking up current events.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            query: {
+              type: Type.STRING,
+              description: 'The search query (e.g., "Weather in Miami", "The Library restaurant address St. Louis", "Movies playing near me")'
+            }
+          },
+          required: ['query']
         }
       },
 
       // 2. ACTION EXECUTION TOOL (The "Doer")
       {
-        type: 'function',
-        function: {
-          name: 'execute_actions',
-          description: 'Call this ONLY when the user explicitly requests an action (e.g., "Book this", "Add expense", "Set budget"). Do NOT use for general questions.',
-          parameters: {
-            type: 'object',
-            properties: {
-              assistant_message: {
-                type: 'string',
-                description: 'A natural, human-like confirmation message to the user. (e.g. "I\'ve created a booking request for The Library at 7 PM.")'
-              },
-              missing_fields: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'List of fields that are still needed to complete the action (e.g., ["partySize", "time"]). Leave empty if all info is present.'
-              },
-              actions: {
-                type: 'array',
-                description: 'The list of actions to perform.',
-                items: {
-                  type: 'object',
-                  properties: {
-                    type: {
-                      type: 'string',
-                      enum: [
-                        'CREATE_BOOKING',
-                        'CONFIRM_BOOKING',
-                        'CREATE_ACTIVITY',
-                        'CREATE_GOAL',
-                        'GENERATE_GOAL_PLAN',
-                        'SET_BUDGET',
-                        'ADD_EXPENSE',
-                        'CREATE_REMINDER',
-                        'EXPORT_CALENDAR_EVENT'
-                      ],
-                      description: 'The specific type of action to execute.'
-                    },
-                    payload: {
-                      type: 'object',
-                      description: `The data required for the action. 
-                        - CREATE_BOOKING: { businessName, datetimeLocal (ISO string), partySize, notes }
-                        - CREATE_ACTIVITY: { name, datetime (ISO string), type (EXERCISE/SOCIAL/WORK/GENERAL), duration (minutes) }
-                        - SET_BUDGET: { category, amount, period (MONTHLY/WEEKLY) }
-                        - ADD_EXPENSE: { merchant, amount, category, date }
-                        - CREATE_REMINDER: { title, datetime (ISO string), priority }
-                        - CREATE_GOAL: { title, targetDate, targetAmount }
-                        - GENERATE_GOAL_PLAN: { goalId, milestones }
-                      `
-                    }
-                  },
-                  required: ['type', 'payload']
-                }
-              }
+        name: 'execute_actions',
+        description: 'Call this ONLY when the user explicitly requests an action (e.g., "Book this", "Add expense", "Set budget"). Do NOT use for general questions.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            assistant_message: {
+              type: Type.STRING,
+              description: 'A natural, human-like confirmation message to the user. (e.g. "I\'ve created a booking request for The Library at 7 PM.")'
             },
-            required: ['assistant_message', 'missing_fields', 'actions']
-          }
+            missing_fields: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: 'List of fields that are still needed to complete the action (e.g., ["partySize", "time"]). Leave empty if all info is present.'
+            },
+            actions: {
+              type: Type.ARRAY,
+              description: 'The list of actions to perform.',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: {
+                    type: Type.STRING,
+                    description: 'The specific type of action: CREATE_BOOKING, CONFIRM_BOOKING, CREATE_ACTIVITY, CREATE_GOAL, GENERATE_GOAL_PLAN, SET_BUDGET, ADD_EXPENSE, CREATE_REMINDER, or EXPORT_CALENDAR_EVENT'
+                  },
+                  payload: {
+                    type: Type.OBJECT,
+                    description: `The data required for the action. 
+                      - CREATE_BOOKING: { businessName, datetimeLocal (ISO string), partySize, notes }
+                      - CREATE_ACTIVITY: { name, datetime (ISO string), type (EXERCISE/SOCIAL/WORK/GENERAL), duration (minutes) }
+                      - SET_BUDGET: { category, amount, period (MONTHLY/WEEKLY) }
+                      - ADD_EXPENSE: { merchant, amount, category, date }
+                      - CREATE_REMINDER: { title, datetime (ISO string), priority }
+                      - CREATE_GOAL: { title, targetDate, targetAmount }
+                      - GENERATE_GOAL_PLAN: { goalId, milestones }
+                    `,
+                    properties: {}
+                  }
+                },
+                required: ['type', 'payload']
+              }
+            }
+          },
+          required: ['assistant_message', 'missing_fields', 'actions']
         }
       }
     ];
@@ -165,101 +142,135 @@ export class AIOrchestrator {
         return true;
     }
   }
+
   static async interpretMessage(
     userMessage: string,
     context: AIContext
   ): Promise<AIResponse> {
     try {
       const systemPrompt = this.buildSystemPrompt(context);
+      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 
-      let messages: any[] = [{ role: 'system', content: systemPrompt }];
-      if (context.recentMessages) messages.push(...context.recentMessages.slice(-5));
-      messages.push({ role: 'user', content: userMessage });
+      // Build conversation contents for Gemini
+      const contents: any[] = [];
+
+      // Add recent messages as conversation history
+      if (context.recentMessages) {
+        for (const msg of context.recentMessages.slice(-5)) {
+          const role = msg.role === 'assistant' ? 'model' : 'user';
+          contents.push({ role, parts: [{ text: msg.content }] });
+        }
+      }
+
+      // Add the current user message
+      contents.push({ role: 'user', parts: [{ text: userMessage }] });
+
+      // Helper: retry with backoff for 429 rate-limit errors
+      const callWithRetry = async (callContents: any[]) => {
+        const MAX_RETRIES = 3;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            return await getGemini().models.generateContent({
+              model,
+              contents: callContents,
+              config: {
+                systemInstruction: systemPrompt,
+                tools: [{ functionDeclarations: this.getGeminiTools() }],
+              },
+            });
+          } catch (err: any) {
+            if (err?.status === 429 && attempt < MAX_RETRIES - 1) {
+              const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s
+              console.warn(`⏳ Rate limited (429). Retrying in ${delay / 1000}s... (attempt ${attempt + 1}/${MAX_RETRIES})`);
+              await new Promise(r => setTimeout(r, delay));
+              continue;
+            }
+            throw err;
+          }
+        }
+        throw new Error('Max retries exceeded');
+      };
 
       // --- PASS 1: Let AI decide (Search vs Talk vs Act) ---
-      let response = await getOpenAI().chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
-        messages,
-        tools: this.getTools() as any, // Cast to 'any' to avoid strict union mismatch issues
-        tool_choice: 'auto',
-      });
+      let response = await callWithRetry(contents);
 
-      let responseMessage = response.choices[0].message;
-      let toolCalls = responseMessage.tool_calls;
+      let candidate = response.candidates?.[0];
+      let parts = candidate?.content?.parts || [];
+
+      // Check for function calls
+      let functionCall = parts.find((p: any) => p.functionCall)?.functionCall;
 
       // --- BRANCH A: Handle Search (if applicable) ---
-      // TS FIX: We first check if toolCalls exists, then grab the first one.
-      if (toolCalls && toolCalls.length > 0) {
-        const firstTool = toolCalls[0];
+      if (functionCall && functionCall.name === 'perform_search') {
+        const searchArgs = functionCall.args as any;
+        console.log(`[Search] query: ${searchArgs.query}`);
 
-        // TS FIX: STRICT TYPE GUARD
-        // We must check firstTool.type === 'function' before accessing .function
-        if (firstTool.type === 'function' && firstTool.function.name === 'perform_search') {
+        // 1. Execute Search
+        const searchData = await getTavily().search(searchArgs.query, { maxResults: 5 });
 
-          const searchArgs = JSON.parse(firstTool.function.arguments);
-          console.log(`🕵️ Searching for: ${searchArgs.query}`);
+        // 2. Feed results back — add the model's function call and our tool response
+        contents.push({
+          role: 'model',
+          parts: [{ functionCall: { name: 'perform_search', args: searchArgs } }]
+        });
+        contents.push({
+          role: 'user',
+          parts: [{
+            functionResponse: {
+              name: 'perform_search',
+              response: { results: searchData.results }
+            }
+          }]
+        });
 
-          // 1. Execute Search
-          const searchData = await getTavily().search(searchArgs.query, { maxResults: 5 });
+        // 3. PASS 2: AI processes results -> Decides to Talk or Act
+        response = await callWithRetry(contents);
 
-          // 2. Feed results back to history
-          messages.push(responseMessage);
-          messages.push({
-            role: 'tool',
-            tool_call_id: firstTool.id,
-            content: `Search Results: ${JSON.stringify(searchData.results)}`
-          });
-
-          // 3. PASS 2: AI processes results -> Decides to Talk or Act
-          response = await getOpenAI().chat.completions.create({
-            model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
-            messages,
-            tools: this.getTools() as any,
-            tool_choice: 'auto'
-          });
-
-          // Update the response message for the next step
-          responseMessage = response.choices[0].message;
-          toolCalls = responseMessage.tool_calls;
-        }
+        candidate = response.candidates?.[0];
+        parts = candidate?.content?.parts || [];
+        functionCall = parts.find((p: any) => p.functionCall)?.functionCall;
       }
 
       // --- BRANCH B: Handle Actions ---
-      // TS FIX: Re-check toolCalls for the final response
-      if (toolCalls && toolCalls.length > 0) {
-        const finalTool = toolCalls[0];
-        console.log(`\n🤖 AI tool call: ${finalTool.type === 'function' ? finalTool.function.name : 'unknown'}`);
-
-        // TS FIX: Again, strict check for 'function' type
-        if (finalTool.type === 'function' && finalTool.function.name === 'execute_actions') {
-          const result = JSON.parse(finalTool.function.arguments);
-          console.log(`   assistant_message: ${result.assistant_message}`);
-          console.log(`   missing_fields: ${JSON.stringify(result.missing_fields)}`);
-          console.log(`   actions (${(result.actions || []).length}):`, JSON.stringify(result.actions, null, 2));
-          return {
-            assistantMessage: result.assistant_message,
-            missingFields: result.missing_fields || [],
-            actions: result.actions || [],
-          };
-        }
+      if (functionCall && functionCall.name === 'execute_actions') {
+        const result = functionCall.args as any;
+        console.log(`\n[AI] tool call: execute_actions`);
+        console.log(`   message: ${result.assistant_message}`);
+        console.log(`   missing_fields: ${JSON.stringify(result.missing_fields)}`);
+        console.log(`   actions (${(result.actions || []).length}):`, JSON.stringify(result.actions, null, 2));
+        return {
+          assistantMessage: result.assistant_message,
+          missingFields: result.missing_fields || [],
+          actions: result.actions || [],
+        };
       }
 
-      console.log(`\n🤖 AI responded with plain text (no tool call). Content: ${(responseMessage.content || '').substring(0, 100)}...`);
+      // --- Plain text response (no tool call) ---
+      const textContent = parts.find((p: any) => p.text)?.text || '';
+      console.log(`\n[AI] plain text response (no tool call). Content: ${textContent.substring(0, 100)}...`);
       return {
-        assistantMessage: responseMessage.content || "I'm here to help! What's on your mind?",
+        assistantMessage: textContent || "I'm here to help! What's on your mind?",
         missingFields: [],
         actions: []
       };
 
     } catch (error: any) {
-      console.error('❌ AI Orchestrator error:', error?.message || error);
+      console.error('AI Orchestrator error:', error?.message || error);
       console.error('   Stack:', error?.stack);
       console.error('   Status:', error?.status);
       console.error('   Code:', error?.code);
       // Write to debug file
       const fs = require('fs');
       fs.appendFileSync('debug_ai.log', `[${new Date().toISOString()}] AI Error:\n  Message: ${error?.message}\n  Status: ${error?.status}\n  Code: ${error?.code}\n  Stack: ${error?.stack}\n  Full: ${JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2)}\n\n`);
-      return { assistantMessage: "I encountered a system error.", missingFields: [], actions: [] };
+
+      // Return user-friendly messages based on error type
+      let userMessage = "I'm sorry, I encountered an unexpected error. Please try again.";
+      if (error?.status === 429) {
+        userMessage = "I'm experiencing high demand right now. Please try again in a moment.";
+      } else if (error?.status === 404) {
+        userMessage = "AI service configuration error. Please contact support.";
+      }
+      return { assistantMessage: userMessage, missingFields: [], actions: [] };
     }
   }
   private static buildSystemPrompt(context: AIContext): string {
@@ -308,7 +319,7 @@ Use perform_search if the user asks about:
 - Restaurants or places
 - Business hours
 - Addresses or phone numbers
-- “Find”, “near me”, “open now”
+- "Find", "near me", "open now"
 - Events, news, or real-time info
 
 Examples:

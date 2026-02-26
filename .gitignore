@@ -60,4 +60,8 @@ temp/
 debug_*.log
 models.json
 
+# implementation plans
+PERSON_B_ROADMAP.md
+AI_Call_Center_MVP_PRD_Design.md
+
 
