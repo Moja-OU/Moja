@@ -130,7 +130,7 @@ export class SmsService {
             lastActivity: Date.now(),
         };
 
-        return `👋 Welcome to Moja, ${user.name}!\n\nPlease reply with your 4-digit PIN to verify your identity.`;
+        return `Hey ${user.name}! Welcome to Moja.\n\nPlease enter your 4-digit PIN to get started.`;
     }
 
 
@@ -161,10 +161,16 @@ export class SmsService {
                 assistantMessage: 'Identity verified via SMS.',
             });
 
-            return `✅ Verified! Hi ${user.name} 🌟\n\nYou can now ask me anything — I'm your AI assistant.\n\n💬 Chat with me\n🔍 Search the web\n📅 (More features coming soon!)\n\nJust type your question!`;
-        } else {
-            return `❌ Incorrect PIN. Please try again.\n\nReply with your 4-digit PIN.`;
+            return `Verified! Hey ${user.name}!\n\nYou can now ask me anything — I'm your AI assistant.\n\nChat with me, search the web, or ask about anything.\n\nJust type your question!`;
         }
+
+        // If they sent something that's clearly not a PIN (not 4 digits), nudge gently
+        const looksLikePin = /^\d{4}$/.test(input);
+        if (!looksLikePin) {
+            return `Hey ${user.name}! I need your 4-digit PIN first to verify it's you.\n\nPlease reply with your PIN.`;
+        }
+
+        return `That PIN didn't match. Please try again.\n\nReply with your 4-digit PIN.`;
     }
 
 
