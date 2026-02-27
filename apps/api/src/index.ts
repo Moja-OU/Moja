@@ -689,6 +689,20 @@ app.post('/voice/process', async (req, res) => {
   }
 });
 
+// After PIN verification, connect to the Gemini realtime voice stream
+app.post('/voice/connect-stream', async (req, res) => {
+  try {
+    const { CallSid } = req.body;
+    console.log(`Connecting verified call ${CallSid} to stream`);
+    const twiml = await VoiceService.connectToStream(CallSid);
+    res.type('text/xml');
+    res.send(twiml);
+  } catch (error) {
+    console.error('Voice connect-stream error:', error);
+    res.status(200).send('<Response><Say>Failed to connect. Please call again.</Say></Response>');
+  }
+});
+
 // Handle Twilio call status updates (hangup, etc.)
 app.post('/voice/status', async (req, res) => {
   try {
