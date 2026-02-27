@@ -178,7 +178,7 @@ export class VoiceRealtimeService {
                 turns: [
                     {
                         role: "user",
-                        parts: [{ text: "Hello, I am on the phone. respond with a short greeting" }]
+                        parts: [{ text: "The user just verified their identity with a PIN. Greet them warmly and ask how you can help them today. Keep it short and natural." }]
                     }
                 ],
                 turn_complete: true

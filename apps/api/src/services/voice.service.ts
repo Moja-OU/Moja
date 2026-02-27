@@ -158,16 +158,14 @@ export class VoiceService {
 
         if (user.voicePin && user.voicePin === input) {
           session.state = CallState.DISCOVERY;
-          const greeting = `Verified! Hey ${user.name}. How can I help you today?`;
-          twiml.say(greeting);
 
-          // Persist the greeting to DB
+          // Log the auth event
           await SessionService.appendToSession(session.dbSessionId, session.userId, {
             userMessage: '[PIN verified]',
-            assistantMessage: greeting,
+            assistantMessage: 'Identity verified via voice.',
           });
 
-          // Redirect to connect to the Gemini realtime stream
+          // Go straight to the stream — let Gemini handle the greeting
           twiml.redirect('/voice/connect-stream');
           return twiml.toString();
         } else {
