@@ -92,7 +92,7 @@ const NODES: Node[] = [
         id: 'tavily',
         x: 848, y: 120, w: 185, h: 105,
         title: 'Tavily Search',
-        subtitle: 'Realtime Web Intelligence',
+        subtitle: 'Live Web Search',
         lines: ['Weather · Hours · Places', 'Live news & events'],
         color: '#fbbf24',
         glyph: '🔍',
@@ -195,7 +195,6 @@ const EDGES: Edge[] = [
         id: 'e8',
         from: [655, 515],
         to: [848, 605],
-        via: [[655, 620]],
         color: '#34d399',
         label: 'Persist',
         dashed: true,
@@ -247,9 +246,13 @@ function midpoint(pts: [number, number][]): [number, number] {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function NodeBox({ node }: { node: Node }) {
-    const { x, y, w, h, title, subtitle, lines, color, glyph } = node;
+    const { x, y, w, lines, color, glyph, title, subtitle } = node;
     const r = 10;
     const pad = 14;
+
+    // Auto-size height: header block + lines + bottom padding
+    const headerH = subtitle ? 54 : 44;
+    const h = headerH + lines.length * 18 + 14;
 
     return (
         <g>
@@ -314,8 +317,8 @@ function NodeBox({ node }: { node: Node }) {
 
             {/* Divider */}
             <line
-                x1={x + pad} y1={y + 46}
-                x2={x + w - pad} y2={y + 46}
+                x1={x + pad} y1={y + headerH - 4}
+                x2={x + w - pad} y2={y + headerH - 4}
                 stroke={color} strokeOpacity={0.2} strokeWidth={1}
             />
 
@@ -323,12 +326,12 @@ function NodeBox({ node }: { node: Node }) {
             {lines.map((line, i) => (
                 <g key={i}>
                     <circle
-                        cx={x + pad + 4} cy={y + 60 + i * 17}
+                        cx={x + pad + 4} cy={y + headerH + 6 + i * 18}
                         r={2}
                         fill={color} fillOpacity={0.6}
                     />
                     <text
-                        x={x + pad + 12} y={y + 60 + i * 17 + 1}
+                        x={x + pad + 12} y={y + headerH + 7 + i * 18}
                         fontSize={9.5}
                         fontFamily="Inter, sans-serif"
                         fill="#94a3b8"
@@ -513,8 +516,6 @@ export default function MojaArchitecture() {
                 background: '#040810',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
                 fontFamily: 'Inter, sans-serif',
                 overflow: 'hidden',
             }}
@@ -525,28 +526,34 @@ export default function MojaArchitecture() {
         * { box-sizing: border-box; }
       `}</style>
 
-            {/* Header */}
+            {/* ── Title header bar ── */}
             <div style={{
-                position: 'absolute', top: 28, left: 40,
-                color: '#f8fafc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 40px 10px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                flexShrink: 0,
             }}>
-                <div style={{
-                    fontSize: 10, letterSpacing: '0.32em', color: '#38bdf8',
-                    fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase',
-                    marginBottom: 6,
-                }}>
-                    System Architecture · Moja AI
+                <div style={{ color: '#f8fafc' }}>
+                    <div style={{
+                        fontSize: 10, letterSpacing: '0.32em', color: '#38bdf8',
+                        fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase',
+                        marginBottom: 4,
+                    }}>
+                        System Architecture · Moja AI
+                    </div>
+                    <div style={{
+                        fontSize: 24, fontWeight: 700, fontFamily: 'Inter, sans-serif',
+                        lineHeight: 1,
+                    }}>
+                        Moja&nbsp;
+                        <span style={{ color: '#60a5fa' }}>Core Infrastructure</span>
+                    </div>
                 </div>
-                <div style={{
-                    fontSize: 28, fontWeight: 700, fontFamily: 'Inter, sans-serif',
-                    lineHeight: 1,
-                }}>
-                    Moja&nbsp;
-                    <span style={{ color: '#60a5fa' }}>Core Infrastructure</span>
-                </div>
-                <div style={{
-                    marginTop: 8, display: 'flex', gap: 20,
-                }}>
+
+                {/* Status badges — right side */}
+                <div style={{ display: 'flex', gap: 20 }}>
                     {[
                         { color: '#22c55e', label: 'LIVE' },
                         { color: '#a78bfa', label: 'GEMINI 2.5' },
@@ -570,10 +577,10 @@ export default function MojaArchitecture() {
                 </div>
             </div>
 
-            {/* Diagram */}
+            {/* ── Diagram ── */}
             <svg
                 viewBox={`0 0 ${W} ${H}`}
-                style={{ width: '96%', maxWidth: 1380 }}
+                style={{ flex: 1, width: '100%' }}
                 aria-label="Moja System Architecture Diagram"
             >
                 <defs>
@@ -657,15 +664,15 @@ export default function MojaArchitecture() {
                 {/* ── Edges (lines + arrowheads, no labels) ── */}
                 {EDGES.map(e => <EdgePath key={e.id} edge={e} />)}
 
-                {/* ── Nodes ── */}
-                {NODES.map(n => <NodeBox key={n.id} node={n} />)}
-
-                {/* ── Particles ── */}
+                {/* ── Particles — rendered before nodes so node backgrounds cover them ── */}
                 {particles.map(p => {
                     const edge = EDGES.find(e => e.id === p.edgeId);
                     if (!edge) return null;
                     return <DataParticle key={p.id} edge={edge} t={p.t} />;
                 })}
+
+                {/* ── Nodes — solid backgrounds sit on top of particles ── */}
+                {NODES.map(n => <NodeBox key={n.id} node={n} />)}
 
                 {/* ── Edge labels — rendered last so they sit above everything ── */}
                 {EDGES.map(e => <EdgeLabel key={e.id} edge={e} />)}
@@ -678,29 +685,35 @@ export default function MojaArchitecture() {
                 backdropFilter: 'blur(12px)',
                 border: '1px solid rgba(255,255,255,0.07)',
                 borderRadius: 12, padding: '14px 18px',
-                display: 'flex', flexDirection: 'column', gap: 8,
+                display: 'flex', flexDirection: 'column', gap: 10,
+                minWidth: 230,
             }}>
+                <div style={{ fontSize: 8, letterSpacing: '0.22em', color: '#475569', fontFamily: "'JetBrains Mono', monospace", marginBottom: 2 }}>
+                    CONNECTION TYPES
+                </div>
                 {[
-                    { color: '#60a5fa', thick: false, dashed: false, label: 'Primary data path' },
-                    { color: '#a78bfa', thick: true, dashed: false, label: 'Bidirectional audio stream' },
-                    { color: '#fbbf24', thick: false, dashed: true, label: 'External API call' },
+                    { color: '#a78bfa', thick: true, dashed: false, label: 'Realtime audio stream', sub: 'High-bandwidth · bidirectional · always-on' },
+                    { color: '#60a5fa', thick: false, dashed: false, label: 'Synchronous call', sub: 'Blocking request / response' },
+                    { color: '#fbbf24', thick: false, dashed: true, label: 'Async / background op', sub: 'Non-blocking · fire and continue' },
                 ].map(l => (
-                    <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <svg width="34" height="10">
+                    <div key={l.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <svg width="34" height="14" style={{ marginTop: 2, flexShrink: 0 }}>
                             <line
-                                x1="2" y1="5" x2="32" y2="5"
+                                x1="2" y1="7" x2="32" y2="7"
                                 stroke={l.color}
                                 strokeWidth={l.thick ? 3 : 1.5}
                                 strokeDasharray={l.dashed ? '4 3' : undefined}
-                                strokeOpacity={0.8}
+                                strokeOpacity={0.85}
                             />
                         </svg>
-                        <span style={{
-                            fontSize: 9, color: '#94a3b8',
-                            fontFamily: "'JetBrains Mono', monospace",
-                        }}>
-                            {l.label}
-                        </span>
+                        <div>
+                            <div style={{ fontSize: 9, color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
+                                {l.label}
+                            </div>
+                            <div style={{ fontSize: 8, color: '#475569', fontFamily: 'Inter, sans-serif', marginTop: 1 }}>
+                                {l.sub}
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>
