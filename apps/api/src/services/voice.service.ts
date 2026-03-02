@@ -59,11 +59,54 @@ export class VoiceService {
       return twiml.toString();
     }
 
-    // Create persisted session? 
-    // NOTE: The VoiceRealtimeService will also try to create a session when the stream connects.
-    // To avoid duplicates, we can let the WebSocket service handle session creation, 
-    // OR create it here and pass the ID in custom params.
-    // Let's pass user ID in custom params so WebSocket knows who it is.
+    // Create a session and store it for PIN verification
+    const dbSession = await SessionService.startSession(user.id, 'VOICE', callSid);
+
+    activeCalls[callSid] = {
+      userId: user.id,
+      dbSessionId: dbSession.id,
+      state: CallState.AUTHENTICATION,
+      history: [],
+    };
+
+    // Greet the user by name and ask for PIN
+    twiml.say(`Hey ${user.name}! Welcome to Moja. Please enter your 4-digit PIN.`);
+    twiml.gather({
+      input: ['dtmf', 'speech'],
+      action: '/voice/process',
+      numDigits: 4,
+      timeout: 10,
+    });
+
+    // If no input, re-prompt
+    twiml.say('I didn\'t hear your PIN. Please try again.');
+    twiml.gather({
+      input: ['dtmf', 'speech'],
+      action: '/voice/process',
+      numDigits: 4,
+      timeout: 10,
+    });
+
+    // After two attempts with no input, hang up
+    twiml.say('Goodbye.');
+    twiml.hangup();
+
+    return twiml.toString();
+  }
+
+  /**
+   * Connect verified user to the Gemini realtime voice stream.
+   * Called after PIN is verified.
+   */
+  static async connectToStream(callSid: string): Promise<string> {
+    const twiml = new VoiceResponse();
+    const session = activeCalls[callSid];
+
+    if (!session) {
+      twiml.say('Session expired. Goodbye.');
+      twiml.hangup();
+      return twiml.toString();
+    }
 
     const webhookUrl = process.env.TWILIO_WEBHOOK_URL;
     const wssUrl = `wss://${webhookUrl?.replace('https://', '').replace('http://', '')}/voice/stream`;
@@ -78,7 +121,7 @@ export class VoiceService {
     // Pass userId to the stream so we know who is calling
     stream.parameter({
       name: 'userId',
-      value: user.id
+      value: session.userId
     });
 
     return twiml.toString();
@@ -108,28 +151,33 @@ export class VoiceService {
 
     switch (session.state) {
       case CallState.AUTHENTICATION:
-        // ✅ Use voicePin field for voice authentication
-        console.log('🔐 PIN Authentication attempt:');
+        console.log('PIN Authentication attempt:');
         console.log('   Expected (voicePin):', user.voicePin, 'Type:', typeof user.voicePin);
         console.log('   Received (input):', input, 'Type:', typeof input);
         console.log('   Match:', user.voicePin === input);
 
         if (user.voicePin && user.voicePin === input) {
           session.state = CallState.DISCOVERY;
-          const greeting = 'Identity verified. How can I help you today?';
-          twiml.say(greeting);
 
-          // Persist the greeting to DB
+          // Log the auth event
           await SessionService.appendToSession(session.dbSessionId, session.userId, {
-            userMessage: '[PIN entered]',
-            assistantMessage: greeting,
+            userMessage: '[PIN verified]',
+            assistantMessage: 'Identity verified via voice.',
           });
+
+          // Go straight to the stream — let Gemini handle the greeting
+          twiml.redirect('/voice/connect-stream');
+          return twiml.toString();
         } else {
-          twiml.say("Incorrect PIN. Please try again.");
-          twiml.gather({ input: ['dtmf', 'speech'], action: '/voice/process' });
+          twiml.say('Incorrect PIN. Please try again.');
+          twiml.gather({
+            input: ['dtmf', 'speech'],
+            action: '/voice/process',
+            numDigits: 4,
+            timeout: 10,
+          });
           return twiml.toString();
         }
-        break;
 
       case CallState.DISCOVERY:
         try {

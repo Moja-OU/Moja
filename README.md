@@ -164,14 +164,14 @@ The AI layer uses **Gemini's function calling** to route user intent into struct
 - ✅ Real-time voice streaming with **Gemini 2.5 Live API** (WebSocket bidirectional audio)
 - ✅ AI-powered actions: bookings, budgets, goals, and web search — all via voice
 - ✅ Full web dashboard synced to call history and user data
-- ✅ Secure PIN-based authentication — no app required
+- ✅ Secure PIN-based authentication with seamless handoff to voice/SMS AI — no app required
+- ✅ Native multilingual support — dynamically detects and responds in the user's language (Swahili, Spanish, French, etc.)
 - ✅ Clean monorepo architecture ready to scale
 
 ---
 
 ## 🚀 Future Improvements
 
-- 🌍 **Multilingual support** — Detect and respond in the caller's native language using Gemini's multilingual capabilities (Spanish, French, Swahili, Hindi, and more)
 - 📱 **Free SMS follow-ups** — Send a text summary of every call (bookings confirmed, goals set, search results) so users have a record even without internet
 - 📞 **Free outbound calls** — Proactively call users for appointment reminders, budget alerts, and goal check-ins
 - 🧠 **Long-term memory** — Persist user preferences, recurring tasks, and life context across all sessions
