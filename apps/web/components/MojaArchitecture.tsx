@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,13 +26,6 @@ interface Edge {
     label?: string;
     thick?: boolean;
     dashed?: boolean;
-}
-
-interface Particle {
-    id: number;
-    edgeId: string;
-    t: number;          // 0–1 progress along path
-    speed: number;
 }
 
 // ─── Layout constants ────────────────────────────────────────────────────────
@@ -448,65 +441,9 @@ function ArrowHead({ to, color, pts }: { to: [number, number]; color: string; pt
     );
 }
 
-function DataParticle({ edge, t }: { edge: Edge; t: number }) {
-    const pts = edgeToPoints(edge);
-    const [cx, cy] = interpolatePath(pts, t);
-    return (
-        <circle
-            cx={cx} cy={cy} r={3.5}
-            fill={edge.color}
-            filter="url(#particleGlow)"
-        />
-    );
-}
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-let _pid = 0;
-
 export default function MojaArchitecture() {
-    const [particles, setParticles] = useState<Particle[]>([]);
-    const frameRef = useRef<number>(0);
-    const lastRef = useRef<number>(0);
-
-    useEffect(() => {
-        const SPAWN_INTERVAL = 900; // ms between spawns per edge
-        const lastSpawn: Record<string, number> = {};
-
-        function tick(now: number) {
-            const dt = (now - (lastRef.current || now)) / 1000;
-            lastRef.current = now;
-
-            setParticles(prev => {
-                // Move existing
-                let next = prev
-                    .map(p => ({ ...p, t: p.t + p.speed * dt }))
-                    .filter(p => p.t < 1);
-
-                // Spawn new
-                for (const edge of EDGES) {
-                    const last = lastSpawn[edge.id] || 0;
-                    if (now - last > SPAWN_INTERVAL + Math.random() * 600) {
-                        lastSpawn[edge.id] = now;
-                        next.push({
-                            id: ++_pid,
-                            edgeId: edge.id,
-                            t: 0,
-                            speed: edge.thick ? 0.22 : 0.18 + Math.random() * 0.08,
-                        });
-                    }
-                }
-
-                return next;
-            });
-
-            frameRef.current = requestAnimationFrame(tick);
-        }
-
-        frameRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(frameRef.current);
-    }, []);
-
     return (
         <div
             style={{
@@ -585,13 +522,6 @@ export default function MojaArchitecture() {
                 <defs>
                     <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
                         <feGaussianBlur stdDeviation="6" result="blur" />
-                        <feMerge>
-                            <feMergeNode in="blur" />
-                            <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                    </filter>
-                    <filter id="particleGlow" x="-200%" y="-200%" width="500%" height="500%">
-                        <feGaussianBlur stdDeviation="3.5" result="blur" />
                         <feMerge>
                             <feMergeNode in="blur" />
                             <feMergeNode in="SourceGraphic" />
