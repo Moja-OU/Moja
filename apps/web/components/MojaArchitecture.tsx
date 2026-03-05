@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,12 +28,6 @@ interface Edge {
     dashed?: boolean;
 }
 
-interface Particle {
-    id: number;
-    edgeId: string;
-    t: number;          // 0–1 progress along path
-    speed: number;
-}
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
@@ -422,91 +416,9 @@ function EdgeLabel({ edge }: { edge: Edge }) {
     );
 }
 
-function ArrowHead({ to, color, pts }: { to: [number, number]; color: string; pts: [number, number][] }) {
-    // Direction from second-to-last to last point
-    const last = pts[pts.length - 1];
-    const prev = pts[pts.length - 2];
-    const dx = last[0] - prev[0];
-    const dy = last[1] - prev[1];
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const size = 8;
-    const px = to[0] - ux * size;
-    const py = to[1] - uy * size;
-    const lx = px - uy * (size * 0.5);
-    const ly = py + ux * (size * 0.5);
-    const rx = px + uy * (size * 0.5);
-    const ry = py - ux * (size * 0.5);
-
-    return (
-        <polygon
-            points={`${to[0]},${to[1]} ${lx},${ly} ${rx},${ry}`}
-            fill={color}
-            fillOpacity={0.8}
-        />
-    );
-}
-
-function DataParticle({ edge, t }: { edge: Edge; t: number }) {
-    const pts = edgeToPoints(edge);
-    const [cx, cy] = interpolatePath(pts, t);
-    return (
-        <circle
-            cx={cx} cy={cy} r={3.5}
-            fill={edge.color}
-            filter="url(#particleGlow)"
-        />
-    );
-}
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-let _pid = 0;
-
 export default function MojaArchitecture() {
-    const [particles, setParticles] = useState<Particle[]>([]);
-    const frameRef = useRef<number>(0);
-    const lastRef = useRef<number>(0);
-
-    useEffect(() => {
-        const SPAWN_INTERVAL = 900; // ms between spawns per edge
-        const lastSpawn: Record<string, number> = {};
-
-        function tick(now: number) {
-            const dt = (now - (lastRef.current || now)) / 1000;
-            lastRef.current = now;
-
-            setParticles(prev => {
-                // Move existing
-                let next = prev
-                    .map(p => ({ ...p, t: p.t + p.speed * dt }))
-                    .filter(p => p.t < 1);
-
-                // Spawn new
-                for (const edge of EDGES) {
-                    const last = lastSpawn[edge.id] || 0;
-                    if (now - last > SPAWN_INTERVAL + Math.random() * 600) {
-                        lastSpawn[edge.id] = now;
-                        next.push({
-                            id: ++_pid,
-                            edgeId: edge.id,
-                            t: 0,
-                            speed: edge.thick ? 0.22 : 0.18 + Math.random() * 0.08,
-                        });
-                    }
-                }
-
-                return next;
-            });
-
-            frameRef.current = requestAnimationFrame(tick);
-        }
-
-        frameRef.current = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(frameRef.current);
-    }, []);
-
     return (
         <div
             style={{
@@ -590,13 +502,7 @@ export default function MojaArchitecture() {
                             <feMergeNode in="SourceGraphic" />
                         </feMerge>
                     </filter>
-                    <filter id="particleGlow" x="-200%" y="-200%" width="500%" height="500%">
-                        <feGaussianBlur stdDeviation="3.5" result="blur" />
-                        <feMerge>
-                            <feMergeNode in="blur" />
-                            <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                    </filter>
+
                     {/* Grid pattern */}
                     <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
                         <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#1e293b" strokeWidth="0.6" />
