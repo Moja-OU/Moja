@@ -422,32 +422,6 @@ function EdgeLabel({ edge }: { edge: Edge }) {
     );
 }
 
-function ArrowHead({ to, color, pts }: { to: [number, number]; color: string; pts: [number, number][] }) {
-    // Direction from second-to-last to last point
-    const last = pts[pts.length - 1];
-    const prev = pts[pts.length - 2];
-    const dx = last[0] - prev[0];
-    const dy = last[1] - prev[1];
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const size = 8;
-    const px = to[0] - ux * size;
-    const py = to[1] - uy * size;
-    const lx = px - uy * (size * 0.5);
-    const ly = py + ux * (size * 0.5);
-    const rx = px + uy * (size * 0.5);
-    const ry = py - ux * (size * 0.5);
-
-    return (
-        <polygon
-            points={`${to[0]},${to[1]} ${lx},${ly} ${rx},${ry}`}
-            fill={color}
-            fillOpacity={0.8}
-        />
-    );
-}
-
 function DataParticle({ edge, t }: { edge: Edge; t: number }) {
     const pts = edgeToPoints(edge);
     const [cx, cy] = interpolatePath(pts, t);
