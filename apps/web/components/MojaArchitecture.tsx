@@ -367,8 +367,7 @@ function EdgePath({ edge }: { edge: Edge }) {
                 strokeDasharray={edge.dashed ? '6 5' : undefined}
                 strokeOpacity={0.65}
             />
-            {/* Arrowhead */}
-            <ArrowHead to={edge.to} color={edge.color} pts={pts} />
+
         </g>
     );
 }
@@ -661,21 +660,12 @@ export default function MojaArchitecture() {
                     </g>
                 ))}
 
-                {/* ── Edges (lines + arrowheads, no labels) ── */}
+                {/* ── Edges ── */}
                 {EDGES.map(e => <EdgePath key={e.id} edge={e} />)}
-
-                {/* ── Particles — rendered before nodes so node backgrounds cover them ── */}
-                {particles.map(p => {
-                    const edge = EDGES.find(e => e.id === p.edgeId);
-                    if (!edge) return null;
-                    return <DataParticle key={p.id} edge={edge} t={p.t} />;
-                })}
 
                 {/* ── Nodes — solid backgrounds sit on top of particles ── */}
                 {NODES.map(n => <NodeBox key={n.id} node={n} />)}
 
-                {/* ── Edge labels — rendered last so they sit above everything ── */}
-                {EDGES.map(e => <EdgeLabel key={e.id} edge={e} />)}
             </svg>
 
             {/* Legend */}
