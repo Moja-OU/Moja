@@ -569,7 +569,7 @@ export default function MojaArchitecture() {
                 {/* ── Edges ── */}
                 {EDGES.map(e => <EdgePath key={e.id} edge={e} />)}
 
-                {/* ── Nodes — solid backgrounds sit on top of particles ── */}
+                {/* ── Nodes — solid backgrounds render above edges and backgrounds ── */}
                 {NODES.map(n => <NodeBox key={n.id} node={n} />)}
 
             </svg>
